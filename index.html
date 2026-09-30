@@ -96,6 +96,21 @@ details summary{cursor:pointer;font-weight:600}
 .guide h3{font-size:14px;margin:0 0 3px}
 .guide p{margin:0;color:var(--muted);font-size:14px;max-width:65ch}
 .err{color:var(--no);font-size:14px}
+details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"▸";color:var(--muted);font-size:13px}
+details.fold[open]>summary::after{content:"▾"}
+details.fold:not([open])>summary h2{margin:0}
+details.leg{margin-top:8px}
+details.leg>summary{font-size:13px;color:var(--muted);justify-content:flex-start}
+@media (max-width:599px){
+  .wrap{padding-inline:10px;gap:10px}
+  h1{font-size:22px}
+  .controls{flex-wrap:nowrap}
+  .controls select{flex:1;min-width:0}
+  #refresh .lbl{display:none}
+  .panel{padding:10px}
+}
 .syn{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:14px;align-items:start}
 @media (max-width:760px){.syn{grid-template-columns:1fr}}
 #syn-map{width:100%;height:auto;display:block;border-radius:6px;background:var(--bg)}
@@ -130,8 +145,7 @@ details summary{cursor:pointer;font-weight:600}
         <button id="m-gfs" aria-pressed="true">GFS</button>
         <button id="m-ecmwf" aria-pressed="false">ECMWF</button>
       </div>
-      <button id="all">10 jours</button>
-      <button id="refresh" aria-label="Actualiser">↻ Actualiser</button>
+      <button id="refresh" aria-label="Actualiser">↻<span class="lbl"> Actualiser</span></button>
     </div>
   </header>
 
@@ -145,6 +159,7 @@ details summary{cursor:pointer;font-weight:600}
   <section class="panel">
     <h2>Vent en altitude, au sol, et pression</h2>
     <svg id="c-wind" viewBox="0 0 1000 300" role="img" aria-label="Vent en altitude et pression"></svg>
+    <details class="fold leg"><summary>Légende du graphe</summary>
     <div class="leg-full">
       <div>
         <h3>Courbes (vent en km/h, échelle de gauche)</h3>
@@ -163,20 +178,22 @@ details summary{cursor:pointer;font-weight:600}
         <p><i class="vline thin"></i><b>Traits fins</b> — minuit, début de chaque jour.</p>
       </div>
     </div>
+    </details>
   </section>
 
   <section class="panel">
-    <h2>Température / point de rosée (air sec ou humide)</h2>
+    <details class="fold"><summary><h2>Température / point de rosée (air sec ou humide)</h2></summary>
     <svg id="c-hum" viewBox="0 0 1000 220" role="img" aria-label="Température et point de rosée"></svg>
     <div class="legend">
       <span><i style="background:var(--t)"></i>Température 2 m</span>
       <span><i style="background:var(--td)"></i>Point de rosée</span>
       <span><i style="background:var(--no-bg);height:10px"></i>Écart &lt; 2 °C : saturé</span>
     </div>
+    </details>
   </section>
 
   <section class="panel">
-    <h2>Ciel, précipitations, verdict</h2>
+    <details class="fold"><summary><h2>Ciel, précipitations, verdict</h2></summary>
     <svg id="c-sky" viewBox="0 0 1000 200" role="img" aria-label="Nuages, précipitations et verdict horaire"></svg>
     <div class="legend">
       <span><i style="background:var(--cloud);height:10px"></i>Nuages moyens</span>
@@ -184,6 +201,7 @@ details summary{cursor:pointer;font-weight:600}
       <span><i style="background:var(--rain);height:10px"></i>Précip. (mm/h)</span>
       <span>Bande : verdict heure par heure (vent + humidité, le plus prudent des 2 modèles)</span>
     </div>
+    </details>
   </section>
 
   <section class="panel">
@@ -203,7 +221,7 @@ details summary{cursor:pointer;font-weight:600}
   </section>
 
   <section class="panel">
-    <h2>Autres cartes de pression</h2>
+    <details class="fold"><summary><h2>Autres cartes de pression</h2></summary>
     <details id="windy-d">
       <summary>Carte animée Windy (pression, ECMWF) dans l'app</summary>
       <div id="windy-box"></div>
@@ -228,6 +246,7 @@ details summary{cursor:pointer;font-weight:600}
         <a href="https://www.pataclimb.com/knowledge/weather.html" target="_blank" rel="noopener">Guide météo pataclimb ↗<span>Méthode de lecture de R. Garibotti</span></a>
       </div>
     </div>
+    </details>
   </section>
 
   <div class="tip" id="tip" role="status"></div>
@@ -584,7 +603,6 @@ function render(suffix){
   const age=Math.round((Date.now()-S.fetched)/60000);
   $("meta").textContent=`${spot().name} · ${S.model.toUpperCase()} · point modèle ${Math.round(S.data.elev)} m · MAJ il y a ${age<60?age+" min":Math.round(age/60)+" h"}${suffix||""}`;
   $("m-gfs").setAttribute("aria-pressed",S.model==="gfs");$("m-ecmwf").setAttribute("aria-pressed",S.model==="ecmwf");
-  $("all").hidden=!S.range;
   $("leg-alt").textContent=`700 mb ${other(S.model).toUpperCase()} (autre modèle)`;
   document.querySelectorAll(".th-ok").forEach(e=>e.textContent=S.th.ok);document.querySelectorAll(".th-max").forEach(e=>e.textContent=S.th.max);
   drawDays();drawWind();drawHum();drawSky();drawLinks();drawSyn();
@@ -596,9 +614,12 @@ $("spot").value=S.spot;
 $("spot").onchange=e=>{S.spot=e.target.value;S.range=null;S.data=null;savePrefs();load()};
 $("m-gfs").onclick=()=>{S.model="gfs";savePrefs();render()};
 $("m-ecmwf").onclick=()=>{S.model="ecmwf";savePrefs();render()};
-$("all").onclick=()=>{S.range=null;render()};
 $("refresh").onclick=()=>{load(true);loadSyn(true)};
 $("windy-d").ontoggle=e=>{const b=$("windy-box");if(e.target.open&&!b.firstChild){const sp=spot();b.innerHTML=`<iframe loading="lazy" title="Windy pression" src="https://embed.windy.com/embed2.html?lat=-50&lon=-75&detailLat=${sp.lat}&detailLon=${sp.lon}&zoom=3&level=surface&overlay=pressure&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=true&type=map&metricWind=km%2Fh&metricTemp=%C2%B0C"></iframe>`}};
+// Phone: secondary panels start folded; redraw charts when a panel opens (hidden svgs have no width)
+const PHONE=matchMedia("(max-width:599px)").matches;
+document.querySelectorAll("details.fold").forEach(d=>{d.open=!PHONE;d.addEventListener("toggle",()=>{if(d.open)render()})});
+document.addEventListener("pointerdown",e=>{if(!e.target.closest("svg"))$("tip").style.display="none"});
 $("syn-t").oninput=e=>drawSyn(+e.target.value);
 [["t-ok","ok"],["t-max","max"],["t-dry","dry"]].forEach(([id,k])=>{$(id).value=S.th[k];$(id).onchange=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.th[k]=v;savePrefs();render()}}});
 let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>render(),150)});
