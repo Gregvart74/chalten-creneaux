@@ -16,14 +16,14 @@
 /* Layout: mobile-first single column — controls, day verdict strip, three stacked charts, guide */
 :root{
   --bg:#f3f5f6; --panel:#fff; --fg:#17212a; --muted:#5c6b77; --line:#d5dde2;
-  --w700:#1f5f8b; --w850:#8fb3c9; --alt:#b0549a; --press:#7a5c3e; --t:#d0452f; --td:#2f8a57;
+  --w700:#1f5f8b; --w600:#7a9fb8; --up:#6a8f3a; --alt:#b0549a; --press:#7a5c3e; --t:#d0452f; --td:#2f8a57;
   --go:#2f8a57; --go-bg:#2f8a5722; --warn:#c98a12; --warn-bg:#c98a1224; --no:#c0392b; --no-bg:#c0392b1f;
   --cloud:#9aa7b1; --rain:#2e7fc2;
   --f-body:"Archivo",system-ui,-apple-system,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#0f161c; --panel:#161f27; --fg:#e4eaee; --muted:#93a3ae; --line:#2a3743;
-  --w700:#6fb4e3; --w850:#3f6780; --alt:#e08acb; --press:#c9a27a; --t:#f07a63; --td:#4cc382;
+  --w700:#6fb4e3; --w600:#5d88a6; --up:#a7c96a; --alt:#e08acb; --press:#c9a27a; --t:#f07a63; --td:#4cc382;
   --go:#4cc382; --go-bg:#4cc38226; --warn:#e6b04a; --warn-bg:#e6b04a26; --no:#ec6b5c; --no-bg:#ec6b5c24;
   --cloud:#5d6b76; --rain:#5aa8ea; color-scheme:dark}}
 *{box-sizing:border-box}
@@ -114,15 +114,16 @@ details summary{cursor:pointer;font-weight:600}
   <section class="panel">
     <h2>Verdict par jour (04h–20h)</h2>
     <div class="days" id="days"></div>
-    <p class="days-note">Vent max en km/h à ~3000 m (700 hPa, voies) et ~700 m (925 hPa, approche). Pression moyenne au niveau de la mer en hPa (repère : &gt; 1020 = beau temps probable), flèche et chiffre = évolution sur la journée.</p>
+    <p class="days-note">Vent max en km/h au-dessus du massif à ~3000 m (700 hPa) et ~4200 m (600 hPa) : les sommets (3100–3400 m) sont entre les deux. « Pac » (Pacifique) = vent à ~3000 m en amont, au-dessus de l'océan, non freiné par le relief du modèle : s'il est fort, ça souffle en haut. Pression moyenne au niveau de la mer en hPa (repère : &gt; 1020 = beau temps probable), flèche et chiffre = évolution sur la journée.</p>
   </section>
 
   <section class="panel">
-    <h2>Vent 700 / 850 mb et pression</h2>
+    <h2>Vent 700 / 600 mb et pression</h2>
     <svg id="c-wind" viewBox="0 0 1000 300" role="img" aria-label="Vent en altitude et pression"></svg>
     <div class="legend">
       <span><i style="background:var(--w700)"></i>700 mb (~3000 m)</span>
-      <span><i style="background:var(--w850)"></i>850 mb (~1500 m)</span>
+      <span><i style="background:var(--w600)"></i>600 mb (~4200 m)</span>
+      <span><i style="background:var(--up);height:2px"></i>700 mb Pacifique (amont)</span>
       <span><i style="background:var(--alt);height:2px"></i>700 mb autre modèle</span>
       <span><i style="background:var(--press);height:2px"></i>Pression (hPa, droite)</span>
     </div>
@@ -207,7 +208,7 @@ details summary{cursor:pointer;font-weight:600}
             <label for="t-dry">Écart T–Td sec ≥</label><input id="t-dry" type="number" inputmode="decimal" value="5">
           </div>
         </div>
-        <div><h3>Vent</h3><p>700 mb ≈ niveau des voies, 850 mb ≈ approche. Bon signal : les deux courbes basses et proches, et la pression qui monte. L'écart entre GFS et ECMWF sur le 700 mb donne la confiance : s'ils divergent, attendre.</p></div>
+        <div><h3>Vent</h3><p>700 mb ≈ 3000 m, 600 mb ≈ 4200 m : les sommets sont entre les deux. Les modèles lissent le relief (sol du modèle ≈ 2500 m ici), ce qui freine le vent calculé au massif : la courbe « Pacifique » donne le vent libre qui arrive. GFS sous-estime nettement le vent ici ; ECMWF est la référence. Bon signal : toutes les courbes basses et la pression qui monte. L'écart entre GFS et ECMWF sur le 700 mb donne la confiance : s'ils divergent, attendre.</p></div>
         <div><h3>Humidité</h3><p>Écart température / rosée &lt; 2 °C : air saturé, nuages, givre, rocher mouillé. ≥ 5 °C avec un vrai cycle jour/nuit : air sec, ciel clair. Courbe plate : ciel couvert.</p></div>
         <div><h3>Direction et pression</h3><p>D'après pataclimb (Garibotti) : le beau temps s'installe au-dessus de 1020 hPa, parfois dès 1000 hPa si les isobares sont très espacées. Vent de S/SO = beau, O/NO = tempête (voir la direction 700 dans la lecture).</p></div>
         <div><h3>Fiabilité</h3><p>Fiable jusqu'à J+3, indicatif jusqu'à J+5, spéculatif au-delà (sauf gros anticyclone, visible parfois 1–2 semaines avant). Températures 2 m à l'altitude du point modèle (affichée en haut), pas au sommet : voir T700 dans la lecture.</p></div>
@@ -227,25 +228,27 @@ const SPOTS=[
   {id:"chalten",name:"El Chaltén (village)",lat:-49.3314,lon:-72.8866},
 ];
 const MODELS={gfs:"gfs_seamless",ecmwf:"ecmwf_ifs025"};
-const VARS=["wind_speed_925hPa","wind_speed_850hPa","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","precipitation","freezing_level_height"];
+const VARS=["wind_speed_600hPa","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","precipitation","freezing_level_height"];
 const TZ="America/Argentina/Rio_Gallegos";
 const JOURS=["dim","lun","mar","mer","jeu","ven","sam"];
 const NS="http://www.w3.org/2000/svg";
-const S={spot:"fitz",model:"gfs",range:null,data:null,fetched:null,th:{ok:30,max:50,dry:5}};
+const S={spot:"fitz",model:"ecmwf",range:null,data:null,fetched:null,th:{ok:30,max:50,dry:5}};
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-Object.assign(S,store.get("prefs")||{}); S.range=null; S.th=Object.assign({ok:30,max:50,dry:5},S.th);
-const savePrefs=()=>store.set("prefs",{spot:S.spot,model:S.model,th:S.th});
+Object.assign(S,store.get("prefs")||{}); if(S.pv!==2){S.model="ecmwf";S.pv=2} S.range=null; // pv2: ECMWF by default (GFS underestimates wind over the massif) S.th=Object.assign({ok:30,max:50,dry:5},S.th);
+const savePrefs=()=>store.set("prefs",{spot:S.spot,model:S.model,th:S.th,pv:S.pv});
 
 const $=id=>document.getElementById(id);
 function el(n,a,p){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
 const spot=()=>SPOTS.find(s=>s.id===S.spot)||SPOTS[0];
 const other=m=>m==="gfs"?"ecmwf":"gfs";
 
-function url(sp){return "https://api.open-meteo.com/v1/forecast?latitude="+sp.lat+"&longitude="+sp.lon+"&hourly="+VARS.join(",")+"&models="+Object.values(MODELS).join(",")+"&forecast_days=10&timezone="+encodeURIComponent(TZ)}
+// Second location: free-atmosphere wind upstream over the Pacific, not slowed by the smoothed model terrain
+const UP={lat:-49.25,lon:-76};
+function url(sp){return "https://api.open-meteo.com/v1/forecast?latitude="+sp.lat+","+UP.lat+"&longitude="+sp.lon+","+UP.lon+"&hourly="+VARS.join(",")+"&models="+Object.values(MODELS).join(",")+"&forecast_days=10&timezone="+encodeURIComponent(TZ)}
 
 async function load(force){
-  const sp=spot(), key="fc2-"+sp.id, cached=store.get(key);
+  const sp=spot(), key="fc3-"+sp.id, cached=store.get(key);
   if(cached&&!force&&Date.now()-cached.fetched<3*3600e3){S.data=cached.data;S.fetched=cached.fetched;render();return}
   if(cached){S.data=cached.data;S.fetched=cached.fetched;render()}
   $("meta").textContent="Mise à jour…";
@@ -256,9 +259,10 @@ async function load(force){
     if(S.data){render(" · hors ligne")}else{$("meta").innerHTML='<span class="err">Pas de réseau et aucune prévision en cache. Réessayez avec une connexion.</span>'}
   }
 }
-function parse(j){
-  const h=j.hourly,out={elev:j.elevation,time:h.time,m:{}};
-  for(const m in MODELS){out.m[m]={};for(const v of VARS){out.m[m][v]=h[v+"_"+MODELS[m]]||h.time.map(()=>null)}}
+function parse(jj){
+  const j=jj[0],u=jj[1].hourly,h=j.hourly,out={elev:j.elevation,time:h.time,m:{}};
+  for(const m in MODELS){out.m[m]={};for(const v of VARS){out.m[m][v]=h[v+"_"+MODELS[m]]||h.time.map(()=>null)}
+    out.m[m].up700=u["wind_speed_700hPa_"+MODELS[m]]||h.time.map(()=>null)}
   return out;
 }
 
@@ -355,7 +359,8 @@ function days(){
     const hrs=idx[k].filter(i=>{const h=+D.time[i].slice(11,13);return h>=4&&h<=20});
     const ok=hrs.filter(i=>d.wind_speed_700hPa[i]!=null); if(!ok.length) continue;
     const w700=Math.max(...ok.map(i=>d.wind_speed_700hPa[i]));
-    const lo=ok.map(i=>d.wind_speed_925hPa[i]).filter(v=>v!=null),w925=lo.length?Math.max(...lo):null;
+    const mx=a=>{const v=ok.map(i=>a[i]).filter(v=>v!=null);return v.length?Math.max(...v):null};
+    const w600=mx(d.wind_speed_600hPa),wup=mx(d.up700);
     const pa=ok.map(i=>d.pressure_msl[i]).filter(v=>v!=null),pm=pa.length?pa.reduce((a,v)=>a+v,0)/pa.length:null;
     const pr=ok.reduce((a,i)=>a+(d.precipitation[i]||0),0);
     const sp=Math.min(...ok.map(i=>d.temperature_2m[i]-d.dew_point_2m[i]));
@@ -363,7 +368,7 @@ function days(){
     const cm=ok.reduce((a,i)=>a+(d.cloud_cover_mid[i]||0),0)/ok.length;
     const th=S.th; let v=w700<=th.ok?0:w700<=th.max?1:2;
     let hv=pr>=1?2:(pr>=0.2||sp<2?1:0); if(sp>=th.dry&&cm<60&&hv===0) hv=0; else if(hv===0&&cm>=80) hv=1;
-    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,w925,pm,pr,sp,dp:p1-p0,cm,v:Math.max(v,hv)});
+    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,w600,wup,pm,pr,sp,dp:p1-p0,cm,v:Math.max(v,hv)});
   }
   return out;
 }
@@ -396,7 +401,7 @@ function axis(svg,vals,Y,side,fmt){vals.forEach(v=>{const t=el("text",{x:side===
 function drawWind(){
   const svg=$("c-wind");svg.innerHTML="";const H=W<600?240:300;size(svg,H);const top=8,bot=22,d=S.data.m[S.model],o=S.data.m[other(S.model)];
   const [a,b]=view();
-  const wmax=Math.max(70,...d.wind_speed_700hPa.slice(a,b+1).filter(v=>v!=null))+5;
+  const wmax=Math.max(70,...[d.wind_speed_700hPa,d.wind_speed_600hPa,d.up700].flatMap(s=>s.slice(a,b+1)).filter(v=>v!=null))+5;
   const Y=v=>top+(H-top-bot)*(1-v/wmax);
   const ps=d.pressure_msl.slice(a,b+1).filter(v=>v!=null);const pmin=Math.floor(Math.min(...ps)/5)*5-5,pmax=Math.ceil(Math.max(...ps)/5)*5+5;
   const P=v=>top+(H-top-bot)*(1-(v-pmin)/(pmax-pmin));
@@ -409,7 +414,8 @@ function drawWind(){
   const pt=[];for(let v=pmin;v<=pmax;v+=10)pt.push(v);axis(svg,pt,P,"r");
   line(svg,d.pressure_msl,P,{stroke:"var(--press)","stroke-width":1.5,"stroke-dasharray":"6 3"});
   line(svg,o.wind_speed_700hPa,Y,{stroke:"var(--alt)","stroke-width":1.4,"stroke-dasharray":"3 3",opacity:.9});
-  line(svg,d.wind_speed_850hPa,Y,{stroke:"var(--w850)","stroke-width":2});
+  line(svg,d.up700,Y,{stroke:"var(--up)","stroke-width":1.4});
+  line(svg,d.wind_speed_600hPa,Y,{stroke:"var(--w600)","stroke-width":2});
   line(svg,d.wind_speed_700hPa,Y,{stroke:"var(--w700)","stroke-width":2.8});
   hover(svg,H,top,bot);
 }
@@ -453,7 +459,7 @@ function showAt(i){
   const d=S.data.m[S.model],o=S.data.m[other(S.model)],T=S.data.time[i],dt=new Date(T.slice(0,10)+"T12:00:00Z");
   const card=v=>v==null?"":["N","NE","E","SE","S","SO","O","NO"][Math.round(v/45)%8];const f=v=>v==null?"–":Math.round(v);const f1=v=>v==null?"–":(Math.round(v*10)/10);
   const sp=(d.temperature_2m[i]!=null&&d.dew_point_2m[i]!=null)?f1(d.temperature_2m[i]-d.dew_point_2m[i]):"–";
-  $("ro").textContent=`${JOURS[dt.getUTCDay()]} ${T.slice(8,10)}/${T.slice(5,7)} ${T.slice(11,13)}h · 700: ${f(d.wind_speed_700hPa[i])} km/h ${card(d.wind_direction_700hPa[i])} (${other(S.model).toUpperCase()} ${f(o.wind_speed_700hPa[i])}) · 850: ${f(d.wind_speed_850hPa[i])} · ${f1(d.pressure_msl[i])} hPa · T–Td ${sp}° · T700 ${f(d.temperature_700hPa[i])}° · iso0 ${f(d.freezing_level_height[i])} m · précip ${f1(d.precipitation[i])} mm · nuages bas/moy ${f(d.cloud_cover_low[i])}/${f(d.cloud_cover_mid[i])}%`;
+  $("ro").textContent=`${JOURS[dt.getUTCDay()]} ${T.slice(8,10)}/${T.slice(5,7)} ${T.slice(11,13)}h · 700: ${f(d.wind_speed_700hPa[i])} km/h ${card(d.wind_direction_700hPa[i])} (${other(S.model).toUpperCase()} ${f(o.wind_speed_700hPa[i])}) · 600: ${f(d.wind_speed_600hPa[i])} · Pacifique 700: ${f(d.up700[i])} · ${f1(d.pressure_msl[i])} hPa · T–Td ${sp}° · T700 ${f(d.temperature_700hPa[i])}° · iso0 ${f(d.freezing_level_height[i])} m · précip ${f1(d.precipitation[i])} mm · nuages bas/moy ${f(d.cloud_cover_low[i])}/${f(d.cloud_cover_mid[i])}%`;
 }
 
 function drawDays(){
@@ -464,7 +470,7 @@ function drawDays(){
     b.setAttribute("aria-pressed",S.range&&S.range[0]===dy.start?"true":"false");
     const arrow=dy.dp>2?"↑":dy.dp<-2?"↓":"→";
     b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[dy.v]}</span>
-      <small title="Vent max à ~3000 m (700 hPa), km/h">3000<span class="x">m</span> <b>${Math.round(dy.w700)}</b></small><small title="Vent max à ~700 m (925 hPa), km/h">700<span class="x">m</span> <b>${dy.w925==null?"–":Math.round(dy.w925)}</b></small><small title="Pression moyenne au niveau de la mer, tendance 04h→20h"><span class="x">P </span><b>${dy.pm==null?"–":Math.round(dy.pm)}</b><span class="x"> </span>${arrow}<span class="x"> ${dy.dp>0?"+":""}${Math.round(dy.dp)}</span></small>
+      <small title="Vent max à ~3000 m (700 hPa), km/h">3000<span class="x">m</span> <b>${Math.round(dy.w700)}</b></small><small title="Vent max à ~4200 m (600 hPa), km/h">4200<span class="x">m</span> <b>${dy.w600==null?"–":Math.round(dy.w600)}</b></small><small title="Vent max à ~3000 m au-dessus du Pacifique (amont), km/h">Pac <b>${dy.wup==null?"–":Math.round(dy.wup)}</b></small><small title="Pression moyenne au niveau de la mer, tendance 04h→20h"><span class="x">P </span><b>${dy.pm==null?"–":Math.round(dy.pm)}</b><span class="x"> </span>${arrow}<span class="x">${dy.dp>0?"+":""}${Math.round(dy.dp)}</span></small>
       <small class="x">T–Td ${Math.round(dy.sp*10)/10}°</small><small class="x">${Math.round(dy.pr*10)/10} mm</small>`;
     b.onclick=()=>{const n=S.data.time.length;const same=S.range&&S.range[0]===dy.start;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];if(!same)S.synI=dy.start+12;render()};
     box.appendChild(b);
