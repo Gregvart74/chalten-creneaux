@@ -16,14 +16,14 @@
 /* Layout: mobile-first single column — controls, day verdict strip, three stacked charts, guide */
 :root{
   --bg:#f3f5f6; --panel:#fff; --fg:#17212a; --muted:#5c6b77; --line:#d5dde2;
-  --w700:#1f5f8b; --w600:#7a9fb8; --up:#6a8f3a; --alt:#b0549a; --press:#7a5c3e; --t:#d0452f; --td:#2f8a57;
+  --w700:#1f5f8b; --up:#6a8f3a; --alt:#b0549a; --press:#7a5c3e; --t:#d0452f; --td:#2f8a57;
   --go:#2f8a57; --go-bg:#2f8a5722; --warn:#c98a12; --warn-bg:#c98a1224; --no:#c0392b; --no-bg:#c0392b1f;
   --cloud:#9aa7b1; --rain:#2e7fc2;
   --f-body:"Archivo",system-ui,-apple-system,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#0f161c; --panel:#161f27; --fg:#e4eaee; --muted:#93a3ae; --line:#2a3743;
-  --w700:#6fb4e3; --w600:#5d88a6; --up:#a7c96a; --alt:#e08acb; --press:#c9a27a; --t:#f07a63; --td:#4cc382;
+  --w700:#6fb4e3; --up:#a7c96a; --alt:#e08acb; --press:#c9a27a; --t:#f07a63; --td:#4cc382;
   --go:#4cc382; --go-bg:#4cc38226; --warn:#e6b04a; --warn-bg:#e6b04a26; --no:#ec6b5c; --no-bg:#ec6b5c24;
   --cloud:#5d6b76; --rain:#5aa8ea; color-scheme:dark}}
 *{box-sizing:border-box}
@@ -48,8 +48,23 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 @media (min-width:860px){.days{grid-template-columns:repeat(10,minmax(0,1fr))}}
 .day{min-width:0;border-radius:8px;padding:7px 8px;display:flex;flex-direction:column;gap:1px;text-align:left;border:1px solid transparent}
 .day small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day small.why{white-space:normal;font-family:var(--f-body);line-height:1.25}
 .day small b{font-size:inherit;color:var(--fg)}
-.day .cf{font-family:var(--f-body);font-style:italic}
+.why{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.why h3{margin:0 0 4px;font-size:16px}
+.why p{margin:0 0 8px;font-size:14px;max-width:70ch}
+.why p.warn{color:var(--warn)}
+.why table{border-collapse:collapse;width:100%;max-width:640px;font-size:13px;font-variant-numeric:tabular-nums}
+.why th,.why td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+.why th{font-weight:600}
+.why td{font-family:var(--f-mono);white-space:nowrap}
+.why td.go{background:var(--go-bg)} .why td.warn{background:var(--warn-bg)} .why td.no{background:var(--no-bg)}
+.why .rule{color:var(--muted);font-family:var(--f-body);font-weight:400;white-space:normal}
+.why tr.info th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:10px}
+@media (max-width:599px){.why .rule{display:none}}
+.tip{position:fixed;z-index:5;pointer-events:none;background:var(--fg);color:var(--bg);font-family:var(--f-mono);font-size:12px;line-height:1.5;
+  padding:7px 9px;border-radius:7px;box-shadow:0 4px 14px #0003;white-space:nowrap;font-variant-numeric:tabular-nums;display:none}
+.tip b{font-family:var(--f-body)}
 .leg-full{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 24px;margin-top:10px}
 .leg-full h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 6px;font-weight:600}
 .leg-full p{margin:0 0 6px;font-size:13px;color:var(--muted);line-height:1.4;padding-left:28px;text-indent:-28px}
@@ -73,8 +88,6 @@ svg{display:block;width:100%;height:auto;touch-action:pan-y}
 svg text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted);margin-top:6px}
 .legend i{display:inline-block;width:16px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
-.readout{position:sticky;bottom:env(safe-area-inset-bottom,0);z-index:2;font-family:var(--f-mono);font-size:12px;font-variant-numeric:tabular-nums;
-  background:var(--fg);color:var(--bg);border-radius:8px;padding:8px 10px;min-height:2.6em}
 .links{display:flex;flex-wrap:wrap;gap:8px}
 .links a{font-family:var(--f-mono);font-size:12.5px;color:var(--fg);text-decoration:none;border:1px solid var(--line);background:var(--panel);padding:7px 10px;border-radius:6px}
 details summary{cursor:pointer;font-weight:600}
@@ -125,18 +138,18 @@ details summary{cursor:pointer;font-weight:600}
   <section class="panel">
     <h2>Verdict par jour (04h–20h, le plus prudent des 2 modèles)</h2>
     <div class="days" id="days"></div>
-    <p class="days-note">Vent max en km/h au-dessus du massif à ~3000 m (700 hPa) et ~4200 m (600 hPa) : les sommets (3100–3400 m) sont entre les deux. « Pac » (Pacifique) = vent à ~3000 m en amont, au-dessus de l'océan, non freiné par le relief du modèle : s'il est fort, ça souffle en haut. Pression moyenne au niveau de la mer en hPa (repère : &gt; 1020 = beau temps probable), flèche et chiffre = évolution sur la journée.</p>
+    <p class="days-note">Touchez un jour pour voir le détail et zoomer les graphes.</p>
+    <div class="why" id="why"></div>
   </section>
 
   <section class="panel">
-    <h2>Vent 700 / 600 mb et pression</h2>
+    <h2>Vent en altitude, au sol, et pression</h2>
     <svg id="c-wind" viewBox="0 0 1000 300" role="img" aria-label="Vent en altitude et pression"></svg>
     <div class="leg-full">
       <div>
         <h3>Courbes (vent en km/h, échelle de gauche)</h3>
         <p><i style="background:var(--w700);height:4px"></i><b>700 mb, ~3000 m</b> — vent au massif, niveau des voies. Sert au verdict.</p>
-        <p><i style="background:var(--w600)"></i><b>600 mb, ~4200 m</b> — au-dessus des sommets (3100–3400 m). Les sommets prennent un vent entre ces deux courbes.</p>
-        <p><i style="background:var(--up)"></i><b>700 mb Pacifique</b> — vent libre à ~3000 m au-dessus de l'océan (49°S, 76°W), avant le relief. Si elle est haute alors que le massif est calme, le modèle freine sans doute trop : prudence.</p>
+        <p><i style="background:var(--up)"></i><b>Rafales au sol, El Chaltén</b> — vent en bas (village, 10 m). Les modèles lissent la vallée : à lire comme une tendance.</p>
         <p><i class="dash" style="--c:var(--alt)"></i><b id="leg-alt">700 mb autre modèle</b> — même vent au massif vu par l'autre modèle. Écart important = prévision incertaine.</p>
         <p><i class="dash" style="--c:var(--press)"></i><b>Pression au niveau de la mer</b> (hPa, échelle de droite). Au-dessus de 1020 et en hausse : bon signe.</p>
       </div>
@@ -144,9 +157,9 @@ details summary{cursor:pointer;font-weight:600}
         <h3>Fonds et repères</h3>
         <p><i class="zone" style="background:var(--go-bg)"></i><b>Vert</b> — vent ≤ <span class="th-ok">30</span> km/h : confortable.</p>
         <p><i class="zone" style="background:var(--warn-bg)"></i><b>Orange</b> — <span class="th-ok">30</span> à <span class="th-max">50</span> km/h : limite.</p>
-        <p><i class="zone" style="background:var(--no-bg)"></i><b>Rouge</b> — plus de <span class="th-max">50</span> km/h : non. Seuils réglables dans « Seuils et lecture ».</p>
+        <p><i class="zone" style="background:var(--no-bg)"></i><b>Rouge</b> — plus de <span class="th-max">50</span> km/h : non. Réglables dans « Seuils et lecture ».</p>
         <p><i class="vline dot"></i><b>Pointillé vertical</b> — maintenant.</p>
-        <p><i class="vline"></i><b>Trait vertical plein</b> — curseur : position lue dans le bandeau noir en bas.</p>
+        <p><i class="vline"></i><b>Trait vertical plein</b> — curseur : les valeurs s'affichent dans la bulle.</p>
         <p><i class="vline thin"></i><b>Traits fins</b> — minuit, début de chaque jour.</p>
       </div>
     </div>
@@ -217,7 +230,7 @@ details summary{cursor:pointer;font-weight:600}
     </div>
   </section>
 
-  <div class="readout" id="ro">Touchez ou survolez un graphe pour lire les valeurs.</div>
+  <div class="tip" id="tip" role="status"></div>
 
   <section class="panel">
     <details>
@@ -231,7 +244,7 @@ details summary{cursor:pointer;font-weight:600}
             <label for="t-dry">Écart T–Td sec ≥</label><input id="t-dry" type="number" inputmode="decimal" value="5">
           </div>
         </div>
-        <div><h3>Vent</h3><p>700 mb ≈ 3000 m, 600 mb ≈ 4200 m : les sommets sont entre les deux. Les modèles lissent le relief (sol du modèle ≈ 2500 m ici), ce qui freine le vent calculé au massif : la courbe « Pacifique » donne le vent libre qui arrive. GFS sous-estime nettement le vent ici ; ECMWF est la référence. Bon signal : toutes les courbes basses et la pression qui monte. L'écart entre GFS et ECMWF sur le 700 mb donne la confiance : s'ils divergent, attendre.</p></div>
+        <div><h3>Vent</h3><p>700 mb ≈ 3000 m, le niveau des voies : c'est lui qui fait le verdict. Les rafales au village donnent le vent en bas pour l'approche. Les modèles lissent le relief, donc le vent calculé au massif est plutôt sous-estimé ; GFS l'est nettement plus qu'ECMWF, qui sert de référence. Bon signal : vent bas, pression au-dessus de 1020 et en hausse.</p></div>
         <div><h3>Humidité</h3><p>Écart température / rosée &lt; 2 °C : air saturé, nuages, givre, rocher mouillé. ≥ 5 °C avec un vrai cycle jour/nuit : air sec, ciel clair. Courbe plate : ciel couvert.</p></div>
         <div><h3>Direction et pression</h3><p>D'après pataclimb (Garibotti) : le beau temps s'installe au-dessus de 1020 hPa, parfois dès 1000 hPa si les isobares sont très espacées. Vent de S/SO = beau, O/NO = tempête (voir la direction 700 dans la lecture).</p></div>
         <div><h3>Fiabilité</h3><p>Fiable jusqu'à J+3, indicatif jusqu'à J+5, spéculatif au-delà (sauf gros anticyclone, visible parfois 1–2 semaines avant). Températures 2 m à l'altitude du point modèle (affichée en haut), pas au sommet : voir T700 dans la lecture.</p></div>
@@ -251,7 +264,7 @@ const SPOTS=[
   {id:"chalten",name:"El Chaltén (village)",lat:-49.3314,lon:-72.8866},
 ];
 const MODELS={gfs:"gfs_seamless",ecmwf:"ecmwf_ifs025"};
-const VARS=["wind_speed_600hPa","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","precipitation","freezing_level_height"];
+const VARS=["wind_speed_850hPa","wind_speed_10m","wind_gusts_10m","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","precipitation","freezing_level_height"];
 const TZ="America/Argentina/Rio_Gallegos";
 const JOURS=["dim","lun","mar","mer","jeu","ven","sam"];
 const NS="http://www.w3.org/2000/svg";
@@ -268,10 +281,12 @@ const other=m=>m==="gfs"?"ecmwf":"gfs";
 
 // Second location: free-atmosphere wind upstream over the Pacific, not slowed by the smoothed model terrain
 const UP={lat:-49.25,lon:-76};
-function url(sp){return "https://api.open-meteo.com/v1/forecast?latitude="+sp.lat+","+UP.lat+"&longitude="+sp.lon+","+UP.lon+"&hourly="+VARS.join(",")+"&models="+Object.values(MODELS).join(",")+"&forecast_days=10&timezone="+encodeURIComponent(TZ)}
+// Third location: El Chaltén village, for low-altitude wind (gusts at 10 m)
+const VIL={lat:-49.3314,lon:-72.8866};
+function url(sp){return "https://api.open-meteo.com/v1/forecast?latitude="+sp.lat+","+UP.lat+","+VIL.lat+"&longitude="+sp.lon+","+UP.lon+","+VIL.lon+"&hourly="+VARS.join(",")+"&models="+Object.values(MODELS).join(",")+"&forecast_days=10&timezone="+encodeURIComponent(TZ)}
 
 async function load(force){
-  const sp=spot(), key="fc3-"+sp.id, cached=store.get(key);
+  const sp=spot(), key="fc4-"+sp.id, cached=store.get(key);
   if(cached&&!force&&Date.now()-cached.fetched<3*3600e3){S.data=cached.data;S.fetched=cached.fetched;render();return}
   if(cached){S.data=cached.data;S.fetched=cached.fetched;render()}
   $("meta").textContent="Mise à jour…";
@@ -283,9 +298,10 @@ async function load(force){
   }
 }
 function parse(jj){
-  const j=jj[0],u=jj[1].hourly,h=j.hourly,out={elev:j.elevation,time:h.time,m:{}};
+  const j=jj[0],u=jj[1].hourly,vl=jj[2].hourly,h=j.hourly,out={elev:j.elevation,time:h.time,m:{}};
   for(const m in MODELS){out.m[m]={};for(const v of VARS){out.m[m][v]=h[v+"_"+MODELS[m]]||h.time.map(()=>null)}
-    out.m[m].up700=u["wind_speed_700hPa_"+MODELS[m]]||h.time.map(()=>null)}
+    out.m[m].up700=u["wind_speed_700hPa_"+MODELS[m]]||h.time.map(()=>null);
+    out.m[m].vg=vl["wind_gusts_10m_"+MODELS[m]]||h.time.map(()=>null)}
   return out;
 }
 
@@ -375,25 +391,34 @@ function hourVerdict(d,i){
 }
 const CLS=["go","warn","no"], LBL=["Bon","Limite","Non"];
 function days(model){
-  const D=S.data, d=D.m[model||S.model], out=[];
+  const D=S.data, d=D.m[model||S.model], out=[], th=S.th;
   const idx={};
   D.time.forEach((t,i)=>{const k=t.slice(0,10);(idx[k]=idx[k]||[]).push(i)});
   for(const k in idx){
     const hrs=idx[k].filter(i=>{const h=+D.time[i].slice(11,13);return h>=4&&h<=20});
     const ok=hrs.filter(i=>d.wind_speed_700hPa[i]!=null); if(!ok.length) continue;
-    const w700=Math.max(...ok.map(i=>d.wind_speed_700hPa[i]));
     const mx=a=>{const v=ok.map(i=>a[i]).filter(v=>v!=null);return v.length?Math.max(...v):null};
-    const w600=mx(d.wind_speed_600hPa),wup=mx(d.up700);
+    const w700=mx(d.wind_speed_700hPa),wup=mx(d.up700),vg=mx(d.vg);
     const pa=ok.map(i=>d.pressure_msl[i]).filter(v=>v!=null),pm=pa.length?pa.reduce((a,v)=>a+v,0)/pa.length:null;
     const pr=ok.reduce((a,i)=>a+(d.precipitation[i]||0),0);
     const sp=Math.min(...ok.map(i=>d.temperature_2m[i]-d.dew_point_2m[i]));
     const p0=d.pressure_msl[ok[0]],p1=d.pressure_msl[ok[ok.length-1]];
     const cm=ok.reduce((a,i)=>a+(d.cloud_cover_mid[i]||0),0)/ok.length;
-    const th=S.th; let v=w700<=th.ok?0:w700<=th.max?1:2;
-    let hv=pr>=1?2:(pr>=0.2||sp<2?1:0); if(sp>=th.dry&&cm<60&&hv===0) hv=0; else if(hv===0&&cm>=80) hv=1;
-    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,w600,wup,pm,pr,sp,dp:p1-p0,cm,v:Math.max(v,hv)});
+    // Each criterion that feeds the verdict, with its level (0 bon, 1 limite, 2 non)
+    const crit={
+      wind:w700<=th.ok?0:w700<=th.max?1:2,
+      rain:pr>=1?2:pr>=0.2?1:0,
+      hum:sp<2?1:0,
+      cloud:cm>=80?1:0,
+    };
+    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,wup,vg,pm,pr,sp,dp:p1-p0,cm,crit,v:Math.max(...Object.values(crit))});
   }
   return out;
+}
+const CRIT_TXT={wind:d=>`vent ${Math.round(d.w700)} km/h`,rain:d=>`pluie ${Math.round(d.pr*10)/10} mm`,hum:()=>"air saturé",cloud:()=>"couvert"};
+function mainReason(dy){ // worst criterion; wind first on ties
+  if(dy.v===0) return "calme et sec";
+  const k=["wind","rain","hum","cloud"].find(k=>dy.crit[k]===dy.v);return CRIT_TXT[k](dy);
 }
 
 // ---------- charts ----------
@@ -424,7 +449,7 @@ function axis(svg,vals,Y,side,fmt){vals.forEach(v=>{const t=el("text",{x:side===
 function drawWind(){
   const svg=$("c-wind");svg.innerHTML="";const H=W<600?240:300;size(svg,H);const top=8,bot=22,d=S.data.m[S.model],o=S.data.m[other(S.model)];
   const [a,b]=view();
-  const wmax=Math.max(70,...[d.wind_speed_700hPa,d.wind_speed_600hPa,d.up700].flatMap(s=>s.slice(a,b+1)).filter(v=>v!=null))+5;
+  const wmax=Math.max(70,...[d.wind_speed_700hPa,o.wind_speed_700hPa,d.vg].flatMap(s=>s.slice(a,b+1)).filter(v=>v!=null))+5;
   const Y=v=>top+(H-top-bot)*(1-v/wmax);
   const ps=d.pressure_msl.slice(a,b+1).filter(v=>v!=null);const pmin=Math.floor(Math.min(...ps)/5)*5-5,pmax=Math.ceil(Math.max(...ps)/5)*5+5;
   const P=v=>top+(H-top-bot)*(1-(v-pmin)/(pmax-pmin));
@@ -437,8 +462,7 @@ function drawWind(){
   const pt=[];for(let v=pmin;v<=pmax;v+=10)pt.push(v);axis(svg,pt,P,"r");
   line(svg,d.pressure_msl,P,{stroke:"var(--press)","stroke-width":1.5,"stroke-dasharray":"6 3"});
   line(svg,o.wind_speed_700hPa,Y,{stroke:"var(--alt)","stroke-width":1.4,"stroke-dasharray":"3 3",opacity:.9});
-  line(svg,d.up700,Y,{stroke:"var(--up)","stroke-width":1.4});
-  line(svg,d.wind_speed_600hPa,Y,{stroke:"var(--w600)","stroke-width":2});
+  line(svg,d.vg,Y,{stroke:"var(--up)","stroke-width":2});
   line(svg,d.wind_speed_700hPa,Y,{stroke:"var(--w700)","stroke-width":2.8});
   hover(svg,H,top,bot);
 }
@@ -473,36 +497,71 @@ let cursorLines=[];
 function hover(svg,H,top,bot){
   const g=el("line",{y1:top,y2:H-bot,stroke:"var(--fg)","stroke-width":1,opacity:0},svg);cursorLines.push(g);
   const pick=e=>{const r=svg.getBoundingClientRect();const px=(e.clientX-r.left)/r.width*W;const [a,b]=view();
-    let i=Math.round(a+(px-L)/(R-L)*(b-a));i=Math.max(a,Math.min(b,i));showAt(i)};
+    let i=Math.round(a+(px-L)/(R-L)*(b-a));i=Math.max(a,Math.min(b,i));showAt(i,e.clientX,e.clientY)};
   svg.addEventListener("pointermove",pick);svg.addEventListener("pointerdown",pick);
+  svg.addEventListener("pointerleave",e=>{if(e.pointerType==="mouse")$("tip").style.display="none"});
 }
-function showAt(i){
+function showAt(i,cx,cy){
   const x=xs();cursorLines=cursorLines.filter(l=>l.isConnected);cursorLines.forEach(l=>{l.setAttribute("x1",x(i));l.setAttribute("x2",x(i));l.setAttribute("opacity",.45)});
   if(S.syn&&i!==S.synI)drawSyn(i);
   const d=S.data.m[S.model],o=S.data.m[other(S.model)],T=S.data.time[i],dt=new Date(T.slice(0,10)+"T12:00:00Z");
   const card=v=>v==null?"":["N","NE","E","SE","S","SO","O","NO"][Math.round(v/45)%8];const f=v=>v==null?"–":Math.round(v);const f1=v=>v==null?"–":(Math.round(v*10)/10);
   const sp=(d.temperature_2m[i]!=null&&d.dew_point_2m[i]!=null)?f1(d.temperature_2m[i]-d.dew_point_2m[i]):"–";
-  $("ro").textContent=`${JOURS[dt.getUTCDay()]} ${T.slice(8,10)}/${T.slice(5,7)} ${T.slice(11,13)}h · 700: ${f(d.wind_speed_700hPa[i])} km/h ${card(d.wind_direction_700hPa[i])} (${other(S.model).toUpperCase()} ${f(o.wind_speed_700hPa[i])}) · 600: ${f(d.wind_speed_600hPa[i])} · Pacifique 700: ${f(d.up700[i])} · ${f1(d.pressure_msl[i])} hPa · T–Td ${sp}° · T700 ${f(d.temperature_700hPa[i])}° · iso0 ${f(d.freezing_level_height[i])} m · précip ${f1(d.precipitation[i])} mm · nuages bas/moy ${f(d.cloud_cover_low[i])}/${f(d.cloud_cover_mid[i])}%`;
+  const p=d.pressure_msl[i],pp=d.pressure_msl[Math.max(0,i-6)],tr=p!=null&&pp!=null?(p-pp>1?" ↑":p-pp<-1?" ↓":" →"):"";
+  const tip=$("tip");
+  tip.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${T.slice(8,10)}/${T.slice(5,7)} · ${T.slice(11,13)}h</b><br>
+Vent 3000 m  ${f(d.wind_speed_700hPa[i])} km/h ${card(d.wind_direction_700hPa[i])}  <span style="opacity:.7">(${other(S.model).toUpperCase()} ${f(o.wind_speed_700hPa[i])})</span><br>
+Rafales sol  ${f(d.vg[i])} km/h<br>
+Pression     ${f(p)} hPa${tr}<br>
+T–Td ${sp}° · précip ${f1(d.precipitation[i])} mm<br>
+Iso 0° ${f(d.freezing_level_height[i]??o.freezing_level_height[i])} m · nuages ${f(d.cloud_cover_mid[i])} %`.replace(/  +/g,m=>"&nbsp;".repeat(m.length));
+  if(cx!=null){tip.style.display="block";const w=tip.offsetWidth,h=tip.offsetHeight;
+    let lx=cx+14;if(lx+w>innerWidth-8)lx=cx-w-14;if(lx<8)lx=8;let ly=cy-h-14;if(ly<8)ly=cy+18;
+    tip.style.left=lx+"px";tip.style.top=ly+"px"}
 }
 
 function drawDays(){
   const box=$("days");box.innerHTML="";
-  // Consensus: a day is only as good as the worse of the two models
   const oth={};days(other(S.model)).forEach(o=>oth[o.k]=o);
-  days().forEach(dy=>{
-    const o=oth[dy.k],vs=dy.v;if(o)dy.v=Math.max(vs,o.v);
-    const om=other(S.model).toUpperCase();
-    const cf=!o?"":o.v===vs?`<small class="cf" title="Les deux modèles donnent le même verdict">✓ accord</small>`:`<small class="cf" title="Verdict de l'autre modèle ; le verdict affiché est le plus prudent des deux">${om} ${LBL[o.v]}</small>`;
+  const list=days();
+  if(!S.sel||!list.some(d=>d.k===S.sel)) S.sel=list[0]&&list[0].k;
+  list.forEach(dy=>{
+    const o=oth[dy.k],v=o?Math.max(dy.v,o.v):dy.v;
+    // reason comes from the model that drives the (prudent) verdict
+    const why=o&&o.v>dy.v?`${other(S.model).toUpperCase()} : ${mainReason(o)}`:mainReason(dy);
     const dt=new Date(dy.k+"T12:00:00Z");
-    const b=document.createElement("button");b.className="day "+CLS[dy.v];
-    b.setAttribute("aria-pressed",S.range&&S.range[0]===dy.start?"true":"false");
-    const arrow=dy.dp>2?"↑":dy.dp<-2?"↓":"→";
-    b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[dy.v]}</span>${cf}
-      <small title="Vent max à ~3000 m (700 hPa), km/h">3000<span class="x">m</span> <b>${Math.round(dy.w700)}</b></small><small title="Vent max à ~4200 m (600 hPa), km/h">4200<span class="x">m</span> <b>${dy.w600==null?"–":Math.round(dy.w600)}</b></small><small title="Vent max à ~3000 m au-dessus du Pacifique (amont), km/h">Pac <b>${dy.wup==null?"–":Math.round(dy.wup)}</b></small><small title="Pression moyenne au niveau de la mer, tendance 04h→20h"><span class="x">P </span><b>${dy.pm==null?"–":Math.round(dy.pm)}</b><span class="x"> </span>${arrow}<span class="x">${dy.dp>0?"+":""}${Math.round(dy.dp)}</span></small>
-      <small class="x">T–Td ${Math.round(dy.sp*10)/10}°</small><small class="x">${Math.round(dy.pr*10)/10} mm</small>`;
-    b.onclick=()=>{const n=S.data.time.length;const same=S.range&&S.range[0]===dy.start;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];if(!same)S.synI=dy.start+12;render()};
+    const b=document.createElement("button");b.className="day "+CLS[v];
+    b.setAttribute("aria-pressed",S.sel===dy.k?"true":"false");
+    b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[v]}</span><small class="why">${why}</small>`;
+    b.onclick=()=>{const n=S.data.time.length;const same=S.sel===dy.k&&S.range;S.sel=dy.k;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];if(!same)S.synI=dy.start+12;render()};
     box.appendChild(b);
   });
+  drawWhy(list.find(d=>d.k===S.sel),oth[S.sel]);
+}
+function drawWhy(a,b){
+  const box=$("why");if(!a){box.innerHTML="";return}
+  const A=S.model.toUpperCase(),B=other(S.model).toUpperCase(),th=S.th,f=v=>v==null?"–":Math.round(v),f1=v=>v==null?"–":Math.round(v*10)/10;
+  const v=b?Math.max(a.v,b.v):a.v,dt=new Date(a.k+"T12:00:00Z");
+  const cell=(dy,key,val)=>`<td class="${dy&&key?CLS[dy.crit[key]]:""}">${dy?val(dy):"–"}</td>`;
+  const row=(lbl,key,val,rule)=>`<tr><th>${lbl}</th>${cell(a,key,val)}${cell(b,key,val)}<td class="rule">${rule}</td></tr>`;
+  const arrow=dy=>dy.dp>2?"↑":dy.dp<-2?"↓":"→";
+  // sentence
+  const bad=[];["wind","rain","hum","cloud"].forEach(k=>{const la=a.crit[k],lb=b?b.crit[k]:0;const l=Math.max(la,lb);if(l>0)bad.push(`${CRIT_TXT[k](la>=lb?a:b)} (${la>=lb?A:B})`)});
+  let txt=v===0?"Les deux modèles voient un vent faible, pas de pluie et un air sec.":`À cause de : ${bad.join(", ")}.`;
+  if(b&&a.v!==b.v) txt+=` Les modèles ne sont pas d'accord (${A} ${LBL[a.v]}, ${B} ${LBL[b.v]}) : on garde le plus prudent.`;
+  const warn=[];const up=Math.max(a.wup||0,b&&b.wup||0);if(up>=60&&v<2)warn.push(`vent fort qui arrive du Pacifique (${f(up)} km/h à 3000 m) : le massif pourrait être plus venté que prévu.`);
+  box.innerHTML=`<h3>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1} — <span style="color:var(--${CLS[v]})">${LBL[v]}</span></h3>
+  <p>${txt}</p>${warn.length?`<p class="warn">⚠ ${warn.join(" ")}</p>`:""}
+  <table><thead><tr><th></th><th>${A}</th><th>${B}</th><th class="rule">Règle</th></tr></thead><tbody>
+  ${row("Vent max ~3000 m","wind",d=>f(d.w700)+" km/h",`bon ≤ ${th.ok}, non &gt; ${th.max}`)}
+  ${row("Pluie / neige","rain",d=>f1(d.pr)+" mm",`limite ≥ 0,2, non ≥ 1`)}
+  ${row("Écart T–Td min","hum",d=>f1(d.sp)+"°","&lt; 2° = air saturé")}
+  ${row("Nuages moyens","cloud",d=>f(d.cm)+" %","≥ 80 % = couvert")}
+  <tr class="info"><th colspan="4">Pour info (hors verdict)</th></tr>
+  ${row("Rafales El Chaltén",null,d=>f(d.vg)+" km/h","vent au sol, village")}
+  ${row("Pression moyenne",null,d=>`${f(d.pm)} ${arrow(d)}`,"&gt; 1020 et ↑ = bon signe")}
+  ${row("Vent Pacifique ~3000 m",null,d=>f(d.wup)+" km/h","vent qui arrive")}
+  </tbody></table>`;
 }
 function drawLinks(){
   const sp=spot();
