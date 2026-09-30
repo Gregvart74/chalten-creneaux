@@ -49,6 +49,17 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .day{min-width:0;border-radius:8px;padding:7px 8px;display:flex;flex-direction:column;gap:1px;text-align:left;border:1px solid transparent}
 .day small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .day small b{font-size:inherit;color:var(--fg)}
+.day .cf{font-family:var(--f-body);font-style:italic}
+.leg-full{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 24px;margin-top:10px}
+.leg-full h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 6px;font-weight:600}
+.leg-full p{margin:0 0 6px;font-size:13px;color:var(--muted);line-height:1.4;padding-left:28px;text-indent:-28px}
+.leg-full b{color:var(--fg);font-weight:600}
+.leg-full i{display:inline-block;width:20px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;text-indent:0}
+.leg-full i.dash{background:repeating-linear-gradient(90deg,var(--c) 0 5px,transparent 5px 8px)}
+.leg-full i.zone{height:12px;border:1px solid var(--line)}
+.leg-full i.vline{width:2px;height:14px;margin:0 17px 0 9px;background:var(--fg);opacity:.6}
+.leg-full i.vline.dot{background:repeating-linear-gradient(180deg,var(--fg) 0 2px,transparent 2px 5px);width:1px}
+.leg-full i.vline.thin{width:1px;background:var(--line);opacity:1}
 .days-note{font-size:12px;color:var(--muted);margin:8px 0 0}
 @media (max-width:599px){.day{padding:6px 5px}.day b{font-size:12.5px}.day .v{font-size:12px}.day small{font-size:10.5px}.day .x{display:none}}
 .day[aria-pressed="true"]{border-color:var(--fg)}
@@ -112,7 +123,7 @@ details summary{cursor:pointer;font-weight:600}
   </header>
 
   <section class="panel">
-    <h2>Verdict par jour (04h–20h)</h2>
+    <h2>Verdict par jour (04h–20h, le plus prudent des 2 modèles)</h2>
     <div class="days" id="days"></div>
     <p class="days-note">Vent max en km/h au-dessus du massif à ~3000 m (700 hPa) et ~4200 m (600 hPa) : les sommets (3100–3400 m) sont entre les deux. « Pac » (Pacifique) = vent à ~3000 m en amont, au-dessus de l'océan, non freiné par le relief du modèle : s'il est fort, ça souffle en haut. Pression moyenne au niveau de la mer en hPa (repère : &gt; 1020 = beau temps probable), flèche et chiffre = évolution sur la journée.</p>
   </section>
@@ -120,12 +131,24 @@ details summary{cursor:pointer;font-weight:600}
   <section class="panel">
     <h2>Vent 700 / 600 mb et pression</h2>
     <svg id="c-wind" viewBox="0 0 1000 300" role="img" aria-label="Vent en altitude et pression"></svg>
-    <div class="legend">
-      <span><i style="background:var(--w700)"></i>700 mb (~3000 m)</span>
-      <span><i style="background:var(--w600)"></i>600 mb (~4200 m)</span>
-      <span><i style="background:var(--up);height:2px"></i>700 mb Pacifique (amont)</span>
-      <span><i style="background:var(--alt);height:2px"></i>700 mb autre modèle</span>
-      <span><i style="background:var(--press);height:2px"></i>Pression (hPa, droite)</span>
+    <div class="leg-full">
+      <div>
+        <h3>Courbes (vent en km/h, échelle de gauche)</h3>
+        <p><i style="background:var(--w700);height:4px"></i><b>700 mb, ~3000 m</b> — vent au massif, niveau des voies. Sert au verdict.</p>
+        <p><i style="background:var(--w600)"></i><b>600 mb, ~4200 m</b> — au-dessus des sommets (3100–3400 m). Les sommets prennent un vent entre ces deux courbes.</p>
+        <p><i style="background:var(--up)"></i><b>700 mb Pacifique</b> — vent libre à ~3000 m au-dessus de l'océan (49°S, 76°W), avant le relief. Si elle est haute alors que le massif est calme, le modèle freine sans doute trop : prudence.</p>
+        <p><i class="dash" style="--c:var(--alt)"></i><b id="leg-alt">700 mb autre modèle</b> — même vent au massif vu par l'autre modèle. Écart important = prévision incertaine.</p>
+        <p><i class="dash" style="--c:var(--press)"></i><b>Pression au niveau de la mer</b> (hPa, échelle de droite). Au-dessus de 1020 et en hausse : bon signe.</p>
+      </div>
+      <div>
+        <h3>Fonds et repères</h3>
+        <p><i class="zone" style="background:var(--go-bg)"></i><b>Vert</b> — vent ≤ <span class="th-ok">30</span> km/h : confortable.</p>
+        <p><i class="zone" style="background:var(--warn-bg)"></i><b>Orange</b> — <span class="th-ok">30</span> à <span class="th-max">50</span> km/h : limite.</p>
+        <p><i class="zone" style="background:var(--no-bg)"></i><b>Rouge</b> — plus de <span class="th-max">50</span> km/h : non. Seuils réglables dans « Seuils et lecture ».</p>
+        <p><i class="vline dot"></i><b>Pointillé vertical</b> — maintenant.</p>
+        <p><i class="vline"></i><b>Trait vertical plein</b> — curseur : position lue dans le bandeau noir en bas.</p>
+        <p><i class="vline thin"></i><b>Traits fins</b> — minuit, début de chaque jour.</p>
+      </div>
     </div>
   </section>
 
@@ -146,7 +169,7 @@ details summary{cursor:pointer;font-weight:600}
       <span><i style="background:var(--cloud);height:10px"></i>Nuages moyens</span>
       <span><i style="background:var(--fg);height:2px"></i>Nuages bas</span>
       <span><i style="background:var(--rain);height:10px"></i>Précip. (mm/h)</span>
-      <span>Bande : verdict horaire (vent + humidité)</span>
+      <span>Bande : verdict heure par heure (vent + humidité, le plus prudent des 2 modèles)</span>
     </div>
   </section>
 
@@ -351,8 +374,8 @@ function hourVerdict(d,i){
   return Math.max(v,hv);
 }
 const CLS=["go","warn","no"], LBL=["Bon","Limite","Non"];
-function days(){
-  const D=S.data, d=D.m[S.model], out=[];
+function days(model){
+  const D=S.data, d=D.m[model||S.model], out=[];
   const idx={};
   D.time.forEach((t,i)=>{const k=t.slice(0,10);(idx[k]=idx[k]||[]).push(i)});
   for(const k in idx){
@@ -441,7 +464,7 @@ function drawSky(){
   for(let i=a;i<=b;i++){
     const cm=d.cloud_cover_mid[i];if(cm!=null)el("rect",{x:x(i)-w/2,y:Y(cm),width:w+.3,height:Y(0)-Y(cm),fill:"var(--cloud)",opacity:.55},svg);
     const p=d.precipitation[i];if(p>0){const h=Math.min(1,p/1)*(Y(0)-Y(100))*.7;el("rect",{x:x(i)-w*.3,y:Y(0)-h,width:w*.6,height:h,fill:"var(--rain)"},svg)}
-    const v=hourVerdict(d,i);if(v!=null)el("rect",{x:x(i)-w/2,y:H-bot+20,width:w+.4,height:10,fill:"var(--"+CLS[v]+")"},svg);
+    const v0=hourVerdict(d,i),v1=hourVerdict(S.data.m[other(S.model)],i),v=v0==null?v1:v1==null?v0:Math.max(v0,v1);if(v!=null)el("rect",{x:x(i)-w/2,y:H-bot+20,width:w+.4,height:10,fill:"var(--"+CLS[v]+")"},svg);
   }
   line(svg,d.cloud_cover_low,Y,{stroke:"var(--fg)","stroke-width":1.3,opacity:.8});
   hover(svg,H,top,bot);
@@ -464,12 +487,17 @@ function showAt(i){
 
 function drawDays(){
   const box=$("days");box.innerHTML="";
+  // Consensus: a day is only as good as the worse of the two models
+  const oth={};days(other(S.model)).forEach(o=>oth[o.k]=o);
   days().forEach(dy=>{
+    const o=oth[dy.k],vs=dy.v;if(o)dy.v=Math.max(vs,o.v);
+    const om=other(S.model).toUpperCase();
+    const cf=!o?"":o.v===vs?`<small class="cf" title="Les deux modèles donnent le même verdict">✓ accord</small>`:`<small class="cf" title="Verdict de l'autre modèle ; le verdict affiché est le plus prudent des deux">${om} ${LBL[o.v]}</small>`;
     const dt=new Date(dy.k+"T12:00:00Z");
     const b=document.createElement("button");b.className="day "+CLS[dy.v];
     b.setAttribute("aria-pressed",S.range&&S.range[0]===dy.start?"true":"false");
     const arrow=dy.dp>2?"↑":dy.dp<-2?"↓":"→";
-    b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[dy.v]}</span>
+    b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[dy.v]}</span>${cf}
       <small title="Vent max à ~3000 m (700 hPa), km/h">3000<span class="x">m</span> <b>${Math.round(dy.w700)}</b></small><small title="Vent max à ~4200 m (600 hPa), km/h">4200<span class="x">m</span> <b>${dy.w600==null?"–":Math.round(dy.w600)}</b></small><small title="Vent max à ~3000 m au-dessus du Pacifique (amont), km/h">Pac <b>${dy.wup==null?"–":Math.round(dy.wup)}</b></small><small title="Pression moyenne au niveau de la mer, tendance 04h→20h"><span class="x">P </span><b>${dy.pm==null?"–":Math.round(dy.pm)}</b><span class="x"> </span>${arrow}<span class="x">${dy.dp>0?"+":""}${Math.round(dy.dp)}</span></small>
       <small class="x">T–Td ${Math.round(dy.sp*10)/10}°</small><small class="x">${Math.round(dy.pr*10)/10} mm</small>`;
     b.onclick=()=>{const n=S.data.time.length;const same=S.range&&S.range[0]===dy.start;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];if(!same)S.synI=dy.start+12;render()};
@@ -489,6 +517,8 @@ function render(suffix){
   $("meta").textContent=`${spot().name} · ${S.model.toUpperCase()} · point modèle ${Math.round(S.data.elev)} m · MAJ il y a ${age<60?age+" min":Math.round(age/60)+" h"}${suffix||""}`;
   $("m-gfs").setAttribute("aria-pressed",S.model==="gfs");$("m-ecmwf").setAttribute("aria-pressed",S.model==="ecmwf");
   $("all").hidden=!S.range;
+  $("leg-alt").textContent=`700 mb ${other(S.model).toUpperCase()} (autre modèle)`;
+  document.querySelectorAll(".th-ok").forEach(e=>e.textContent=S.th.ok);document.querySelectorAll(".th-max").forEach(e=>e.textContent=S.th.max);
   drawDays();drawWind();drawHum();drawSky();drawLinks();drawSyn();
 }
 
