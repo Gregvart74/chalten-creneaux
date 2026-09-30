@@ -264,7 +264,7 @@ details.leg>summary{font-size:13px;color:var(--muted);justify-content:flex-start
           </div>
         </div>
         <div><h3>Vent</h3><p>700 mb ≈ 3000 m, le niveau des voies : c'est lui qui fait le verdict. Les rafales au village donnent le vent en bas pour l'approche. Les modèles lissent le relief, donc le vent calculé au massif est plutôt sous-estimé ; GFS l'est nettement plus qu'ECMWF, qui sert de référence. Bon signal : vent bas, pression au-dessus de 1020 et en hausse.</p></div>
-        <div><h3>Humidité</h3><p>Écart température / rosée &lt; 2 °C : air saturé, nuages, givre, rocher mouillé. ≥ 5 °C avec un vrai cycle jour/nuit : air sec, ciel clair. Courbe plate : ciel couvert.</p></div>
+        <div><h3>Humidité</h3><p>Indice à lire, pas un critère du verdict. Écart température / rosée &lt; 2 °C = air saturé au sol du modèle : brume ou nuages bas, souvent une mer de nuages sous les sommets par haute pression. Grand écart avec un vrai cycle jour/nuit : air sec. Courbe plate : ciel couvert.</p></div>
         <div><h3>Direction et pression</h3><p>D'après pataclimb (Garibotti) : le beau temps s'installe au-dessus de 1020 hPa, parfois dès 1000 hPa si les isobares sont très espacées. Vent de S/SO = beau, O/NO = tempête (voir la direction 700 dans la lecture).</p></div>
         <div><h3>Fiabilité</h3><p>Fiable jusqu'à J+3, indicatif jusqu'à J+5, spéculatif au-delà (sauf gros anticyclone, visible parfois 1–2 semaines avant). Températures 2 m à l'altitude du point modèle (affichée en haut), pas au sommet : voir T700 dans la lecture.</p></div>
       </div>
@@ -406,11 +406,10 @@ function drawSyn(i){
 
 // ---------- analysis ----------
 function hourVerdict(d,i){
-  const w=d.wind_speed_700hPa[i], t=d.temperature_2m[i], td=d.dew_point_2m[i], p=d.precipitation[i];
+  const w=d.wind_speed_700hPa[i], p=d.precipitation[i];
   if(w==null) return null;
   const th=S.th; let v=w<=th.ok?0:w<=th.max?1:2;
-  const sp=(t!=null&&td!=null)?t-td:null;
-  let hv=0; if(p>=0.3) hv=2; else if(p>0.05||(sp!=null&&sp<2)) hv=1;
+  let hv=0; if(p>=0.3) hv=2; else if(p>0.05) hv=1;
   return Math.max(v,hv);
 }
 const CLS=["go","warn","no"], LBL=["Bon","Limite","Non"];
@@ -434,17 +433,16 @@ function days(model){
     const crit={
       wind:w700<=th.ok?0:w700<=th.max?1:2,
       rain:pr>=1?2:pr>=0.2?1:0,
-      hum:sat>=3?1:0,
       cloud:cm>=80?1:0,
     };
     out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,wup,vg,pm,pr,sp,sat,dp:p1-p0,cm,crit,v:Math.max(...Object.values(crit))});
   }
   return out;
 }
-const CRIT_TXT={wind:d=>`vent ${Math.round(d.w700)} km/h`,rain:d=>`pluie ${Math.round(d.pr*10)/10} mm`,hum:d=>`air saturé ${d.sat} h`,cloud:()=>"couvert"};
+const CRIT_TXT={wind:d=>`vent ${Math.round(d.w700)} km/h`,rain:d=>`pluie ${Math.round(d.pr*10)/10} mm`,cloud:()=>"couvert"};
 function mainReason(dy){ // worst criterion; wind first on ties
   if(dy.v===0) return "calme et sec";
-  const k=["wind","rain","hum","cloud"].find(k=>dy.crit[k]===dy.v);return CRIT_TXT[k](dy);
+  const k=["wind","rain","cloud"].find(k=>dy.crit[k]===dy.v);return CRIT_TXT[k](dy);
 }
 
 // ---------- charts ----------
@@ -572,20 +570,22 @@ function drawWhy(a,b){
   const row=(lbl,key,val,rule)=>`<tr><th>${lbl}</th>${cell(a,key,val)}${cell(b,key,val)}<td class="rule">${rule}</td></tr>`;
   const arrow=dy=>dy.dp>2?"↑":dy.dp<-2?"↓":"→";
   // sentence
-  const bad=[];["wind","rain","hum","cloud"].forEach(k=>{const la=a.crit[k],lb=b?b.crit[k]:0;const l=Math.max(la,lb);if(l>0)bad.push(`${CRIT_TXT[k](la>=lb?a:b)} (${la>=lb?A:B})`)});
-  let txt=v===0?"Les deux modèles voient un vent faible, pas de pluie et un air sec.":`À cause de : ${bad.join(", ")}.`;
+  const bad=[];["wind","rain","cloud"].forEach(k=>{const la=a.crit[k],lb=b?b.crit[k]:0;const l=Math.max(la,lb);if(l>0)bad.push(`${CRIT_TXT[k](la>=lb?a:b)} (${la>=lb?A:B})`)});
+  let txt=v===0?"Les deux modèles voient un vent faible, pas de pluie et un ciel dégagé en altitude.":`À cause de : ${bad.join(", ")}.`;
   if(b&&a.v!==b.v) txt+=` Les modèles ne sont pas d'accord (${A} ${LBL[a.v]}, ${B} ${LBL[b.v]}) : on garde le plus prudent.`;
   const pmx=Math.max(a.pm||0,b&&b.pm||0),pdp=a.dp;
   if(pmx>=1020) txt+=` Signe positif : pression haute (${f(a.pm)} hPa, ${pdp>2?"en hausse":pdp<-2?"en baisse":"stable"}), régime anticyclonique.`;
-  const warn=[];const up=Math.max(a.wup||0,b&&b.wup||0);if(up>=60&&v<2)warn.push(`vent fort qui arrive du Pacifique (${f(up)} km/h à 3000 m) : le massif pourrait être plus venté que prévu.`);
+  const warn=[];
+  const fog=[a,b].filter(Boolean).filter(d=>d.sat>=3);
+  if(fog.length)warn.push(`Brume ou nuages bas possibles (${fog.map(d=>(d===a?A:B)+" "+d.sat+" h").join(", ")} entre 8h et 18h)${pmx>=1020?" : avec la pression haute, sans doute une mer de nuages sous les sommets":""}.`);const up=Math.max(a.wup||0,b&&b.wup||0);if(up>=60&&v<2)warn.push(`vent fort qui arrive du Pacifique (${f(up)} km/h à 3000 m) : le massif pourrait être plus venté que prévu.`);
   box.innerHTML=`<h3>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1} — <span style="color:var(--${CLS[v]})">${LBL[v]}</span></h3>
   <p>${txt}</p>${warn.length?`<p class="warn">⚠ ${warn.join(" ")}</p>`:""}
   <table><thead><tr><th></th><th>${A}</th><th>${B}</th><th class="rule">Règle</th></tr></thead><tbody>
   ${row("Vent max ~3000 m","wind",d=>f(d.w700)+" km/h",`bon ≤ ${th.ok}, non &gt; ${th.max}`)}
   ${row("Pluie / neige","rain",d=>f1(d.pr)+" mm",`limite ≥ 0,2, non ≥ 1`)}
-  ${row("Heures d'air saturé","hum",d=>d.sat+" h","8h–18h, T–Td &lt; 2° ; limite si ≥ 3 h")}
   ${row("Nuages moyens","cloud",d=>f(d.cm)+" %","≥ 80 % = couvert")}
   <tr class="info"><th colspan="4">Pour info (hors verdict)</th></tr>
+  ${row("Brume / nuages bas",null,d=>d.sat+" h","air saturé au sol du modèle, 8h–18h")}
   ${row("Rafales El Chaltén",null,d=>f(d.vg)+" km/h","vent au sol, village")}
   ${row("Pression moyenne",null,d=>`${f(d.pm)} ${arrow(d)}`,"&gt; 1020 et ↑ = bon signe")}
   ${row("Vent Pacifique ~3000 m",null,d=>f(d.wup)+" km/h","vent qui arrive")}
