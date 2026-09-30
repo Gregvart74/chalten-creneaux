@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Chaltén 3D</title>
+<meta name="theme-color" content="#0f161c">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Prototype: 3D illustration of the forecast over the massif — day chips + hour scrubber on top, scene below, readout overlay */
+:root{--bg:#0f161c;--panel:#161f27cc;--fg:#e4eaee;--muted:#93a3ae;--line:#2a3743;--go:#4cc382;--warn:#e6b04a;--no:#ec6b5c;
+  --f-body:"Archivo",system-ui,-apple-system,sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:var(--f-body);overflow:hidden}
+#scene{position:fixed;inset:0}
+#scene canvas{display:block;touch-action:none}
+.top{position:fixed;left:0;right:0;top:0;z-index:2;padding:calc(env(safe-area-inset-top,0) + 10px) 12px 10px;
+  background:linear-gradient(#0f161ce6,#0f161c99 70%,#0f161c00)}
+.row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+h1{font-size:18px;margin:0;font-weight:800}
+h1 small{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+a.back{color:var(--muted);font-size:13px;text-decoration:none}
+.days{display:flex;gap:6px;overflow-x:auto;margin:10px 0 8px;scrollbar-width:none}
+.days::-webkit-scrollbar{display:none}
+.days button{flex:0 0 auto;font:inherit;font-size:13px;color:var(--fg);background:#ffffff14;border:1px solid transparent;border-radius:8px;padding:6px 9px;cursor:pointer}
+.days button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.scrub{display:flex;align-items:center;gap:10px}
+.scrub button{font:inherit;font-size:14px;width:36px;height:32px;border-radius:8px;border:1px solid var(--line);background:#ffffff14;color:var(--fg);cursor:pointer}
+.scrub input{flex:1;accent-color:var(--fg)}
+.scrub span{font-family:var(--f-mono);font-size:13px;min-width:3.2em;text-align:right}
+.hud{position:fixed;left:12px;bottom:calc(env(safe-area-inset-bottom,0) + 12px);z-index:2;background:var(--panel);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-family:var(--f-mono);font-size:12px;line-height:1.55;max-width:calc(100% - 24px)}
+.hud b{font-family:var(--f-body);font-size:14px}
+.note{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0) + 12px);z-index:2;max-width:260px;font-size:10.5px;color:var(--muted);text-align:right;line-height:1.35}
+@media (max-width:640px){.note{position:fixed;left:12px;right:12px;bottom:auto;top:auto;max-width:none;text-align:left;display:none}}
+.lbl{position:fixed;z-index:1;pointer-events:none;font-size:11.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000c;transform:translate(-50%,-130%);white-space:nowrap}
+.lbl::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:10px;background:#fffa}
+.lbl.v{font-weight:400;color:#fffc}
+#load{position:fixed;inset:0;display:grid;place-items:center;z-index:3;color:var(--muted);font-size:14px;background:var(--bg)}
+.err{color:var(--no)}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="scene"></div>
+<div id="labels"></div>
+<div class="top">
+  <div class="row"><h1>Chaltén 3D<small>prototype</small></h1><a class="back" href="./">← Créneaux</a></div>
+  <div class="days" id="days" role="group" aria-label="Jour"></div>
+  <div class="scrub">
+    <button id="play" aria-label="Lecture">▶</button>
+    <input id="hour" type="range" min="0" max="23" step="1" value="12" aria-label="Heure">
+    <span id="hlbl">12h</span>
+  </div>
+</div>
+<div class="hud" id="hud">Chargement…</div>
+<p class="note">Illustration de la prévision ECMWF (maille ~25 km), pas une simulation face par face.<br>Relief Copernicus GLO-30 (Fitz Roy et Torres recalés à leurs altitudes publiées) · Image Sentinel-2 cloudless 2020 par EOX (CC BY-NC-SA 4.0) · Données Open-Meteo.</p>
+<div id="load">Chargement du massif…</div>
+
+<script type="module">
+import * as THREE from "three";
+import {OrbitControls} from "three/addons/controls/OrbitControls.js";
+
+const TZ="America/Argentina/Rio_Gallegos", UTC_OFFSET=-3; // Argentina: UTC−3, no DST
+const JOURS=["dim","lun","mar","mer","jeu","ven","sam"];
+const FITZ={lat:-49.2714,lon:-73.0431};
+const EXAG=1.15; // slight vertical exaggeration: flat-looking otherwise at this scale
+const $=id=>document.getElementById(id);
+
+// ---------- terrain ----------
+const meta=await (await fetch("3d/relief.json")).json();
+const heights=new Uint16Array(await (await fetch("3d/relief.bin")).arrayBuffer());
+const peaks=await (await fetch("3d/peaks.json")).json();
+const SX=(meta.E-meta.W)*111.32*Math.cos(49.3*Math.PI/180), SZ=(meta.N-meta.S)*111.32; // km
+const pos=(lat,lon,altM)=>new THREE.Vector3((lon-meta.W)/(meta.E-meta.W)*SX-SX/2, altM/1000*EXAG, (meta.N-lat)/(meta.N-meta.S)*SZ-SZ/2);
+function hAt(x,z){ // terrain height (km, exaggerated) at scene x/z, bilinear
+  const u=(x+SX/2)/SX*(meta.w-1), v=(z+SZ/2)/SZ*(meta.h-1);
+  const i=Math.max(0,Math.min(meta.w-2,Math.floor(u))), j=Math.max(0,Math.min(meta.h-2,Math.floor(v))), fu=u-i, fv=v-j;
+  const g=(a,b)=>heights[b*meta.w+a];
+  return ((g(i,j)*(1-fu)+g(i+1,j)*fu)*(1-fv)+(g(i,j+1)*(1-fu)+g(i+1,j+1)*fu)*fv)/1000*EXAG;
+}
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.outputColorSpace=THREE.SRGBColorSpace;
+$("scene").appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x8fb8dd,0.012);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,400);
+const target=pos(FITZ.lat,FITZ.lon,1400);
+camera.position.set(target.x+15,target.y+3.2,target.z+19);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.target.copy(target); controls.enableDamping=true; controls.minDistance=4; controls.maxDistance=55; controls.maxPolarAngle=Math.PI*0.47;
+
+const segX=383, segZ=200;
+const geo=new THREE.PlaneGeometry(SX,SZ,segX,segZ); geo.rotateX(-Math.PI/2);
+const P=geo.attributes.position;
+for(let k=0;k<P.count;k++) P.setY(k,hAt(P.getX(k),P.getZ(k)));
+geo.computeVertexNormals();
+const sat=await new THREE.TextureLoader().loadAsync("3d/sat.jpg");
+sat.colorSpace=THREE.SRGBColorSpace; sat.anisotropy=renderer.capabilities.getMaxAnisotropy();
+const terrain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:sat,roughness:0.95,metalness:0}));
+terrain.castShadow=terrain.receiveShadow=true; scene.add(terrain);
+// dark skirt under the edges so the block reads as a relief model
+const base=new THREE.Mesh(new THREE.BoxGeometry(SX,0.3,SZ),new THREE.MeshStandardMaterial({color:0x1a2229}));base.position.y=-0.16;scene.add(base);
+
+// ---------- lights ----------
+const sun=new THREE.DirectionalLight(0xffffff,3); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048); Object.assign(sun.shadow.camera,{left:-22,right:22,top:22,bottom:-22,near:1,far:120}); sun.shadow.bias=-0.0006;
+scene.add(sun,sun.target);
+const hemi=new THREE.HemisphereLight(0xbfd6ff,0x3a3024,0.6); scene.add(hemi);
+
+// ---------- soft puff texture for clouds ----------
+function puff(){const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d");
+  for(let k=0;k<7;k++){const px=40+Math.random()*48,py=44+Math.random()*40,r=26+Math.random()*26;const g=x.createRadialGradient(px,py,0,px,py,r);
+    g.addColorStop(0,"rgba(255,255,255,.55)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,128,128)}
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t}
+const PUFFS=[puff(),puff(),puff()];
+function cloudLayer(n,y0,y1,s0,s1){
+  const g=new THREE.Group();
+  for(let k=0;k<n;k++){const m=new THREE.SpriteMaterial({map:PUFFS[k%3],transparent:true,depthWrite:false,opacity:0,fog:true});
+    const s=new THREE.Sprite(m);const sc=s0+Math.random()*(s1-s0);s.scale.set(sc*1.8,sc*0.8,1);
+    s.position.set((Math.random()-.5)*SX*1.3,y0+Math.random()*(y1-y0),(Math.random()-.5)*SZ*1.3);s.userData.r=Math.random();g.add(s)}
+  scene.add(g);return g}
+const LOW=cloudLayer(110,0.9,2.0,2.5,5), MID=cloudLayer(110,3.2,4.4,3.5,7), HIGH=cloudLayer(40,7.5,8.5,10,16);
+LOW.userData.max=0.55;MID.userData.max=0.42;HIGH.userData.max=0.3;
+
+// ---------- wind streaks ----------
+const NW=700, wpos=new Float32Array(NW*6), wseed=new Float32Array(NW*4);
+for(let k=0;k<NW;k++){wseed[k*4]=(Math.random()-.5)*SX;wseed[k*4+1]=2.6+Math.random()*1.4;wseed[k*4+2]=(Math.random()-.5)*SZ;wseed[k*4+3]=Math.random()}
+const wgeo=new THREE.BufferGeometry();wgeo.setAttribute("position",new THREE.BufferAttribute(wpos,3));
+const wmat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false});
+scene.add(new THREE.LineSegments(wgeo,wmat));
+
+// ---------- precipitation ----------
+const NP=4000, ppos=new Float32Array(NP*3), pcol=new Float32Array(NP*3);
+for(let k=0;k<NP;k++){ppos[k*3]=(Math.random()-.5)*SX;ppos[k*3+1]=Math.random()*6;ppos[k*3+2]=(Math.random()-.5)*SZ}
+const pgeo=new THREE.BufferGeometry();pgeo.setAttribute("position",new THREE.BufferAttribute(ppos,3));pgeo.setAttribute("color",new THREE.BufferAttribute(pcol,3));
+function dot(){const c=document.createElement("canvas");c.width=c.height=32;const x=c.getContext("2d");const g=x.createRadialGradient(16,16,0,16,16,16);
+  g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(0.5,"rgba(255,255,255,.6)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,32,32);return new THREE.CanvasTexture(c)}
+const pmat=new THREE.PointsMaterial({size:0.05,map:dot(),vertexColors:true,transparent:true,opacity:0,depthWrite:false});
+const precipPts=new THREE.Points(pgeo,pmat);scene.add(precipPts);
+
+// ---------- labels ----------
+const MAIN=["Fitz Roy","Cerro Torre","Guillaumet"];
+const LBLS=[...peaks.filter(p=>MAIN.includes(p.name)).map(p=>({t:`${p.name} ${p.alt}`,p:pos(p.lat,p.lon,p.alt)})),{t:"El Chaltén",p:pos(-49.3314,-72.8866,420),v:1}];
+LBLS.forEach(l=>{l.el=document.createElement("div");l.el.className="lbl"+(l.v?" v":"");l.el.textContent=l.t;$("labels").appendChild(l.el)});
+
+// ---------- forecast ----------
+const VARS=["wind_speed_700hPa","wind_direction_700hPa","cloud_cover_low","cloud_cover_mid","cloud_cover_high","precipitation","freezing_level_height","temperature_2m"];
+let F;
+try{
+  const u="https://api.open-meteo.com/v1/forecast?latitude="+FITZ.lat+"&longitude="+FITZ.lon+"&hourly="+VARS.join(",")+"&models=ecmwf_ifs025,gfs_seamless&forecast_days=10&timezone="+encodeURIComponent(TZ);
+  const j=await (await fetch(u)).json(),h=j.hourly;
+  // ECMWF first, GFS where ECMWF has no value (e.g. freezing level)
+  F={time:h.time};VARS.forEach(v=>F[v]=h.time.map((_,i)=>h[v+"_ecmwf_ifs025"]?.[i]??h[v+"_gfs_seamless"]?.[i]??null));
+}catch(e){$("hud").innerHTML='<span class="err">Prévision indisponible (réseau).</span>'}
+
+const S={day:0,hour:new Date(new Date().toLocaleString("en-US",{timeZone:TZ})).getHours()};
+const dayKeys=F?[...new Set(F.time.map(t=>t.slice(0,10)))]:[];
+dayKeys.forEach((k,i)=>{const d=new Date(k+"T12:00:00Z");const b=document.createElement("button");b.textContent=`${JOURS[d.getUTCDay()]} ${d.getUTCDate()}`;
+  b.onclick=()=>{S.day=i;apply()};$("days").appendChild(b)});
+$("hour").value=S.hour;
+$("hour").oninput=e=>{S.hour=+e.target.value;apply()};
+let playing=false,lastStep=0;
+$("play").onclick=()=>{playing=!playing;$("play").textContent=playing?"❚❚":"▶"};
+
+// ---------- sun position (NOAA approximation) ----------
+function sunPos(dateUTC,lat,lon){
+  const rad=Math.PI/180,d=(dateUTC-Date.UTC(2000,0,1,12))/864e5;
+  const g=(357.529+0.98560028*d)*rad,q=280.459+0.98564736*d,L=(q+1.915*Math.sin(g)+0.020*Math.sin(2*g))*rad,e=(23.439-0.00000036*d)*rad;
+  const ra=Math.atan2(Math.cos(e)*Math.sin(L),Math.cos(L)),dec=Math.asin(Math.sin(e)*Math.sin(L));
+  const gmst=(18.697374558+24.06570982441908*d)%24,lst=(gmst*15+lon)*rad,H=lst-ra;
+  const alt=Math.asin(Math.sin(lat*rad)*Math.sin(dec)+Math.cos(lat*rad)*Math.cos(dec)*Math.cos(H));
+  const az=Math.atan2(-Math.sin(H),Math.tan(dec)*Math.cos(lat*rad)-Math.sin(lat*rad)*Math.cos(H)); // from north, clockwise
+  return {alt,az};
+}
+
+// ---------- apply forecast hour to the scene ----------
+const W={dx:0,dz:0,speed:0},C={low:0,mid:0,high:0},R={rate:0,iso:3};
+const cSky=new THREE.Color(),cTmp=new THREE.Color();
+function apply(){
+  if(!F)return;
+  [...$("days").children].forEach((b,i)=>b.setAttribute("aria-pressed",i===S.day));
+  $("hour").value=S.hour;$("hlbl").textContent=S.hour+"h";
+  const key=dayKeys[S.day]+"T"+String(S.hour).padStart(2,"0")+":00",i=F.time.indexOf(key);if(i<0)return;
+  const g=v=>F[v][i];
+  // wind: meteorological "from" direction → blowing toward
+  const to=((g("wind_direction_700hPa")??270)+180)*Math.PI/180;W.speed=g("wind_speed_700hPa")??0;W.dx=Math.sin(to);W.dz=-Math.cos(to);
+  C.low=(g("cloud_cover_low")??0)/100;C.mid=(g("cloud_cover_mid")??0)/100;C.high=(g("cloud_cover_high")??0)/100;
+  R.rate=g("precipitation")??0;R.iso=(g("freezing_level_height")??1500)/1000*EXAG;
+  // sun
+  const [Y,M,D]=dayKeys[S.day].split("-").map(Number);const s=sunPos(Date.UTC(Y,M-1,D,S.hour-UTC_OFFSET,0),FITZ.lat,FITZ.lon);
+  const up=Math.sin(s.alt),dayK=THREE.MathUtils.smoothstep(up,-0.08,0.15),dusk=Math.max(0,1-Math.abs(up-0.05)/0.18);
+  const dist=60;sun.position.set(target.x+Math.sin(s.az)*Math.cos(s.alt)*dist,target.y+Math.max(0.02,up)*dist,target.z-Math.cos(s.az)*Math.cos(s.alt)*dist);sun.target.position.copy(target);
+  const overcast=Math.max(C.low*0.9,C.mid*0.8,Math.min(1,R.rate));
+  sun.intensity=3.2*dayK*(1-0.75*overcast); sun.color.setRGB(1,0.82+0.18*(1-dusk),0.62+0.38*(1-dusk));
+  hemi.intensity=0.08+0.65*dayK;
+  // sky and fog: night navy → dusk orange → day blue, greyed by cloud
+  cSky.set(0x0b1320).lerp(cTmp.set(0xe7a36c),dusk*dayK).lerp(cTmp.set(0x8fb8dd),dayK*(1-dusk)).lerp(cTmp.set(0x8e969c),overcast*dayK*0.85);
+  scene.background=cSky.clone();scene.fog.color.copy(cSky);scene.fog.density=0.004+0.018*Math.max(C.low*C.low,Math.min(1,R.rate*1.5));
+  // cloud tint follows the light
+  const tint=new THREE.Color(0x2a3440).lerp(new THREE.Color(0xffffff),0.25+0.75*dayK).lerp(new THREE.Color(0xffc9a0),dusk*0.6*dayK).lerp(new THREE.Color(0x9aa3aa),overcast*0.5);
+  [[LOW,C.low],[MID,C.mid],[HIGH,C.high*0.6]].forEach(([grp,cov])=>grp.children.forEach(sp=>{sp.material.color.copy(tint);sp.userData.target=sp.userData.r<cov?grp.userData.max*(0.6+0.4*cov):0}));
+  // HUD
+  const f=v=>v==null?"–":Math.round(v),card=v=>v==null?"":["N","NE","E","SE","S","SO","O","NO"][Math.round(v/45)%8];
+  const dt=new Date(dayKeys[S.day]+"T12:00:00Z");
+  $("hud").innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1} · ${S.hour}h</b><br>`+
+    `Vent 3000 m ${f(W.speed)} km/h ${card(g("wind_direction_700hPa"))}<br>`+
+    `Nuages bas ${f(C.low*100)} % · moy ${f(C.mid*100)} % · hauts ${f(C.high*100)} %<br>`+
+    `Précip ${Math.round(R.rate*10)/10} mm/h · iso 0° ${f(g("freezing_level_height"))} m<br>`+
+    `Soleil ${s.alt>0?"à "+Math.round(s.alt*180/Math.PI)+"° de haut":"couché"}`;
+}
+
+// ---------- animate ----------
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix()}
+addEventListener("resize",resize);resize();
+const clock=new THREE.Clock(),v3=new THREE.Vector3();
+function tick(){
+  // (browsers already suspend requestAnimationFrame in background tabs, so no manual pause needed)
+  const dt=Math.min(0.05,clock.getDelta()),t=clock.elapsedTime;
+  if(playing&&t-lastStep>0.7){lastStep=t;S.hour=(S.hour+1)%24;if(S.hour===0)S.day=Math.min(dayKeys.length-1,S.day+1);apply()}
+  const drift=W.speed/60; // km per second on screen, proportional to wind
+  // clouds drift with the wind and fade toward their target opacity
+  for(const grp of [LOW,MID,HIGH])for(const sp of grp.children){
+    sp.position.x+=W.dx*drift*dt*(grp===HIGH?1.6:1);sp.position.z+=W.dz*drift*dt*(grp===HIGH?1.6:1);
+    if(sp.position.x>SX*.65)sp.position.x-=SX*1.3;if(sp.position.x<-SX*.65)sp.position.x+=SX*1.3;
+    if(sp.position.z>SZ*.65)sp.position.z-=SZ*1.3;if(sp.position.z<-SZ*.65)sp.position.z+=SZ*1.3;
+    const o=sp.material.opacity,tg=sp.userData.target||0;sp.material.opacity=o+(tg-o)*Math.min(1,dt*2.5)}
+  // wind streaks: count and opacity grow with speed
+  const len=0.25+W.speed/45,vis=Math.min(1,W.speed/70),active=Math.round(NW*Math.min(1,W.speed/80));
+  wmat.opacity=0.15+0.5*vis;
+  for(let k=0;k<NW;k++){
+    let x=wseed[k*4],y=wseed[k*4+1],z=wseed[k*4+2];
+    x+=W.dx*drift*3*dt*(0.7+wseed[k*4+3]);z+=W.dz*drift*3*dt*(0.7+wseed[k*4+3]);
+    if(x>SX/2)x-=SX;if(x<-SX/2)x+=SX;if(z>SZ/2)z-=SZ;if(z<-SZ/2)z+=SZ;
+    wseed[k*4]=x;wseed[k*4+2]=z;
+    const on=k<active,yy=Math.max(y,hAt(x,z)+0.15);
+    wpos.set(on?[x,yy,z,x-W.dx*len,yy,z-W.dz*len]:[0,-9,0,0,-9,0],k*6)}
+  wgeo.attributes.position.needsUpdate=true;
+  // precipitation: rain below the freezing level, snow above
+  const rate=Math.min(1,R.rate/1.5);pmat.opacity=rate>0.01?0.85:0;
+  if(rate>0.01){const n=Math.round(NP*Math.min(1,0.15+rate));
+    for(let k=0;k<NP;k++){let x=ppos[k*3],y=ppos[k*3+1],z=ppos[k*3+2];
+      const snow=y>R.iso;y-=(snow?0.9:4)*dt;x+=W.dx*drift*(snow?1.2:0.4)*dt;z+=W.dz*drift*(snow?1.2:0.4)*dt;
+      if(k>=n||y<hAt(x,z)){x=(Math.random()-.5)*SX;z=(Math.random()-.5)*SZ;y=k<n?5+Math.random()*1.5:-9}
+      ppos[k*3]=x;ppos[k*3+1]=y;ppos[k*3+2]=z;
+      if(snow){pcol[k*3]=pcol[k*3+1]=pcol[k*3+2]=1}else{pcol[k*3]=0.55;pcol[k*3+1]=0.7;pcol[k*3+2]=0.95}}
+    pgeo.attributes.position.needsUpdate=true;pgeo.attributes.color.needsUpdate=true}
+  controls.update();renderer.render(scene,camera);
+  // labels follow their summit on screen
+  for(const l of LBLS){v3.copy(l.p).project(camera);const vis2=v3.z<1&&Math.abs(v3.x)<1.1&&Math.abs(v3.y)<1.1;
+    l.el.style.display=vis2?"block":"none";if(vis2){l.el.style.left=(v3.x+1)/2*innerWidth+"px";l.el.style.top=(1-v3.y)/2*innerHeight+"px"}}
+  requestAnimationFrame(tick);
+}
+apply();$("load").remove();tick();
+</script>
+</body>
+</html>
