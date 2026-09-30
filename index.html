@@ -138,7 +138,7 @@ details summary{cursor:pointer;font-weight:600}
   <section class="panel">
     <h2>Verdict par jour (04h–20h, le plus prudent des 2 modèles)</h2>
     <div class="days" id="days"></div>
-    <p class="days-note">Touchez un jour pour voir le détail et zoomer les graphes.</p>
+    <p class="days-note">Touchez un jour pour voir le détail.</p>
     <div class="why" id="why"></div>
   </section>
 
@@ -404,18 +404,20 @@ function days(model){
     const sp=Math.min(...ok.map(i=>d.temperature_2m[i]-d.dew_point_2m[i]));
     const p0=d.pressure_msl[ok[0]],p1=d.pressure_msl[ok[ok.length-1]];
     const cm=ok.reduce((a,i)=>a+(d.cloud_cover_mid[i]||0),0)/ok.length;
+    // Saturated hours during climbing hours only: a humid hour at dawn over snow is normal in fine weather
+    const sat=ok.filter(i=>{const h=+D.time[i].slice(11,13),t=d.temperature_2m[i],td=d.dew_point_2m[i];return h>=8&&h<=18&&t!=null&&td!=null&&t-td<2}).length;
     // Each criterion that feeds the verdict, with its level (0 bon, 1 limite, 2 non)
     const crit={
       wind:w700<=th.ok?0:w700<=th.max?1:2,
       rain:pr>=1?2:pr>=0.2?1:0,
-      hum:sp<2?1:0,
+      hum:sat>=3?1:0,
       cloud:cm>=80?1:0,
     };
-    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,wup,vg,pm,pr,sp,dp:p1-p0,cm,crit,v:Math.max(...Object.values(crit))});
+    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,wup,vg,pm,pr,sp,sat,dp:p1-p0,cm,crit,v:Math.max(...Object.values(crit))});
   }
   return out;
 }
-const CRIT_TXT={wind:d=>`vent ${Math.round(d.w700)} km/h`,rain:d=>`pluie ${Math.round(d.pr*10)/10} mm`,hum:()=>"air saturé",cloud:()=>"couvert"};
+const CRIT_TXT={wind:d=>`vent ${Math.round(d.w700)} km/h`,rain:d=>`pluie ${Math.round(d.pr*10)/10} mm`,hum:d=>`air saturé ${d.sat} h`,cloud:()=>"couvert"};
 function mainReason(dy){ // worst criterion; wind first on ties
   if(dy.v===0) return "calme et sec";
   const k=["wind","rain","hum","cloud"].find(k=>dy.crit[k]===dy.v);return CRIT_TXT[k](dy);
@@ -533,7 +535,7 @@ function drawDays(){
     const b=document.createElement("button");b.className="day "+CLS[v];
     b.setAttribute("aria-pressed",S.sel===dy.k?"true":"false");
     b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[v]}</span><small class="why">${why}</small>`;
-    b.onclick=()=>{const n=S.data.time.length;const same=S.sel===dy.k&&S.range;S.sel=dy.k;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];if(!same)S.synI=dy.start+12;render()};
+    b.onclick=()=>{S.sel=dy.k;S.synI=dy.start+12;render()}; // detail + map follow the day; charts keep the 10-day view
     box.appendChild(b);
   });
   drawWhy(list.find(d=>d.k===S.sel),oth[S.sel]);
@@ -549,13 +551,15 @@ function drawWhy(a,b){
   const bad=[];["wind","rain","hum","cloud"].forEach(k=>{const la=a.crit[k],lb=b?b.crit[k]:0;const l=Math.max(la,lb);if(l>0)bad.push(`${CRIT_TXT[k](la>=lb?a:b)} (${la>=lb?A:B})`)});
   let txt=v===0?"Les deux modèles voient un vent faible, pas de pluie et un air sec.":`À cause de : ${bad.join(", ")}.`;
   if(b&&a.v!==b.v) txt+=` Les modèles ne sont pas d'accord (${A} ${LBL[a.v]}, ${B} ${LBL[b.v]}) : on garde le plus prudent.`;
+  const pmx=Math.max(a.pm||0,b&&b.pm||0),pdp=a.dp;
+  if(pmx>=1020) txt+=` Signe positif : pression haute (${f(a.pm)} hPa, ${pdp>2?"en hausse":pdp<-2?"en baisse":"stable"}), régime anticyclonique.`;
   const warn=[];const up=Math.max(a.wup||0,b&&b.wup||0);if(up>=60&&v<2)warn.push(`vent fort qui arrive du Pacifique (${f(up)} km/h à 3000 m) : le massif pourrait être plus venté que prévu.`);
   box.innerHTML=`<h3>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1} — <span style="color:var(--${CLS[v]})">${LBL[v]}</span></h3>
   <p>${txt}</p>${warn.length?`<p class="warn">⚠ ${warn.join(" ")}</p>`:""}
   <table><thead><tr><th></th><th>${A}</th><th>${B}</th><th class="rule">Règle</th></tr></thead><tbody>
   ${row("Vent max ~3000 m","wind",d=>f(d.w700)+" km/h",`bon ≤ ${th.ok}, non &gt; ${th.max}`)}
   ${row("Pluie / neige","rain",d=>f1(d.pr)+" mm",`limite ≥ 0,2, non ≥ 1`)}
-  ${row("Écart T–Td min","hum",d=>f1(d.sp)+"°","&lt; 2° = air saturé")}
+  ${row("Heures d'air saturé","hum",d=>d.sat+" h","8h–18h, T–Td &lt; 2° ; limite si ≥ 3 h")}
   ${row("Nuages moyens","cloud",d=>f(d.cm)+" %","≥ 80 % = couvert")}
   <tr class="info"><th colspan="4">Pour info (hors verdict)</th></tr>
   ${row("Rafales El Chaltén",null,d=>f(d.vg)+" km/h","vent au sol, village")}
