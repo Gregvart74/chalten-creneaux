@@ -48,6 +48,8 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 @media (min-width:860px){.days{grid-template-columns:repeat(10,minmax(0,1fr))}}
 .day{min-width:0;border-radius:8px;padding:7px 8px;display:flex;flex-direction:column;gap:1px;text-align:left;border:1px solid transparent}
 .day small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day small b{font-size:inherit;color:var(--fg)}
+.days-note{font-size:12px;color:var(--muted);margin:8px 0 0}
 @media (max-width:599px){.day{padding:6px 5px}.day b{font-size:12.5px}.day .v{font-size:12px}.day small{font-size:10.5px}.day .x{display:none}}
 .day[aria-pressed="true"]{border-color:var(--fg)}
 .day b{font-size:14px}
@@ -79,6 +81,12 @@ details summary{cursor:pointer;font-weight:600}
 .syn-scale+div{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
 .syn p{margin:0 0 8px;color:var(--muted);font-size:14px;max-width:60ch}
 .syn b{color:var(--fg)}
+.maps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:10px}
+.maps h3{font-size:13px;margin:0 0 6px}
+.maps a{display:block;font-size:14px;color:var(--fg);text-decoration:none;padding:6px 0;border-bottom:1px solid var(--line)}
+.maps a span{display:block;font-size:12px;color:var(--muted)}
+#windy-box{margin-top:12px}
+#windy-box iframe{width:100%;height:min(70vh,520px);border:0;border-radius:6px;display:block}
 .th{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;font-size:13px}
 .th label{color:var(--muted)}
 .th input{width:70px;font:inherit;font-size:14px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
@@ -106,6 +114,7 @@ details summary{cursor:pointer;font-weight:600}
   <section class="panel">
     <h2>Verdict par jour (04h–20h)</h2>
     <div class="days" id="days"></div>
+    <p class="days-note">Vent max en km/h à ~3000 m (700 hPa, voies) et ~700 m (925 hPa, approche). Pression moyenne au niveau de la mer en hPa (repère : &gt; 1020 = beau temps probable), flèche et chiffre = évolution sur la journée.</p>
   </section>
 
   <section class="panel">
@@ -156,6 +165,34 @@ details summary{cursor:pointer;font-weight:600}
     </div>
   </section>
 
+  <section class="panel">
+    <h2>Autres cartes de pression</h2>
+    <details id="windy-d">
+      <summary>Carte animée Windy (pression, ECMWF) dans l'app</summary>
+      <div id="windy-box"></div>
+    </details>
+    <div class="maps">
+      <div>
+        <h3>Animées, zoom libre</h3>
+        <a href="https://www.windy.com/-50/-75?pressure,-50,-75,4" target="_blank" rel="noopener">Windy · pression ↗<span>Isobares + défilement horaire, ECMWF/GFS/ICON</span></a>
+        <a href="https://www.ventusky.com/?p=-50;-73;4&l=pressure" target="_blank" rel="noopener">Ventusky · pression ↗<span>Lisible sur mobile, plusieurs modèles</span></a>
+        <a href="https://earth.nullschool.net/#current/wind/surface/level/overlay=mean_sea_level_pressure/orthographic=-73,-50,700" target="_blank" rel="noopener">Earth nullschool · pression ↗<span>Vue globe, flux de vent + pression</span></a>
+      </div>
+      <div>
+        <h3>Cartes de prévisionniste (Tropical Tidbits)</h3>
+        <a href="https://www.tropicaltidbits.com/analysis/models/?model=gfs&region=samer&pkg=z500_mslp" target="_blank" rel="noopener">GFS · 500 hPa + pression, Am. du Sud ↗<span>Repérer les dorsales / blocages en altitude</span></a>
+        <a href="https://www.tropicaltidbits.com/analysis/models/?model=ecmwf&region=samer&pkg=z500_mslp" target="_blank" rel="noopener">ECMWF · 500 hPa + pression, Am. du Sud ↗<span>Même carte, modèle européen</span></a>
+        <a href="https://www.tropicaltidbits.com/analysis/models/?model=gfs&region=sepac&pkg=z500_mslp" target="_blank" rel="noopener">GFS · Pacifique sud-est ↗<span>Voir arriver les dépressions de l'ouest</span></a>
+        <a href="https://www.tropicaltidbits.com/analysis/models/?model=ecmwf&region=samer&pkg=mslp_uv850" target="_blank" rel="noopener">ECMWF · pression + vent 850 hPa ↗<span>Force du flux d'ouest à ~1500 m</span></a>
+      </div>
+      <div>
+        <h3>Références</h3>
+        <a href="https://www.ready.noaa.gov/READYcmet.php" target="_blank" rel="noopener">NOAA READY ↗<span>Météogrammes GFS utilisés par pataclimb</span></a>
+        <a href="https://www.pataclimb.com/knowledge/weather.html" target="_blank" rel="noopener">Guide météo pataclimb ↗<span>Méthode de lecture de R. Garibotti</span></a>
+      </div>
+    </div>
+  </section>
+
   <div class="readout" id="ro">Touchez ou survolez un graphe pour lire les valeurs.</div>
 
   <section class="panel">
@@ -190,7 +227,7 @@ const SPOTS=[
   {id:"chalten",name:"El Chaltén (village)",lat:-49.3314,lon:-72.8866},
 ];
 const MODELS={gfs:"gfs_seamless",ecmwf:"ecmwf_ifs025"};
-const VARS=["wind_speed_850hPa","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","precipitation","freezing_level_height"];
+const VARS=["wind_speed_925hPa","wind_speed_850hPa","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","precipitation","freezing_level_height"];
 const TZ="America/Argentina/Rio_Gallegos";
 const JOURS=["dim","lun","mar","mer","jeu","ven","sam"];
 const NS="http://www.w3.org/2000/svg";
@@ -208,7 +245,7 @@ const other=m=>m==="gfs"?"ecmwf":"gfs";
 function url(sp){return "https://api.open-meteo.com/v1/forecast?latitude="+sp.lat+"&longitude="+sp.lon+"&hourly="+VARS.join(",")+"&models="+Object.values(MODELS).join(",")+"&forecast_days=10&timezone="+encodeURIComponent(TZ)}
 
 async function load(force){
-  const sp=spot(), key="fc-"+sp.id, cached=store.get(key);
+  const sp=spot(), key="fc2-"+sp.id, cached=store.get(key);
   if(cached&&!force&&Date.now()-cached.fetched<3*3600e3){S.data=cached.data;S.fetched=cached.fetched;render();return}
   if(cached){S.data=cached.data;S.fetched=cached.fetched;render()}
   $("meta").textContent="Mise à jour…";
@@ -318,13 +355,15 @@ function days(){
     const hrs=idx[k].filter(i=>{const h=+D.time[i].slice(11,13);return h>=4&&h<=20});
     const ok=hrs.filter(i=>d.wind_speed_700hPa[i]!=null); if(!ok.length) continue;
     const w700=Math.max(...ok.map(i=>d.wind_speed_700hPa[i]));
+    const lo=ok.map(i=>d.wind_speed_925hPa[i]).filter(v=>v!=null),w925=lo.length?Math.max(...lo):null;
+    const pa=ok.map(i=>d.pressure_msl[i]).filter(v=>v!=null),pm=pa.length?pa.reduce((a,v)=>a+v,0)/pa.length:null;
     const pr=ok.reduce((a,i)=>a+(d.precipitation[i]||0),0);
     const sp=Math.min(...ok.map(i=>d.temperature_2m[i]-d.dew_point_2m[i]));
     const p0=d.pressure_msl[ok[0]],p1=d.pressure_msl[ok[ok.length-1]];
     const cm=ok.reduce((a,i)=>a+(d.cloud_cover_mid[i]||0),0)/ok.length;
     const th=S.th; let v=w700<=th.ok?0:w700<=th.max?1:2;
     let hv=pr>=1?2:(pr>=0.2||sp<2?1:0); if(sp>=th.dry&&cm<60&&hv===0) hv=0; else if(hv===0&&cm>=80) hv=1;
-    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,pr,sp,dp:p1-p0,cm,v:Math.max(v,hv)});
+    out.push({k,start:idx[k][0],end:idx[k][idx[k].length-1],w700,w925,pm,pr,sp,dp:p1-p0,cm,v:Math.max(v,hv)});
   }
   return out;
 }
@@ -425,7 +464,7 @@ function drawDays(){
     b.setAttribute("aria-pressed",S.range&&S.range[0]===dy.start?"true":"false");
     const arrow=dy.dp>2?"↑":dy.dp<-2?"↓":"→";
     b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[dy.v]}</span>
-      <small title="Vent 700 mb max">${Math.round(dy.w700)} km/h</small><small title="Tendance pression">P ${arrow}<span class="x"> ${dy.dp>0?"+":""}${Math.round(dy.dp)} hPa</span></small>
+      <small title="Vent max à ~3000 m (700 hPa), km/h">3000<span class="x">m</span> <b>${Math.round(dy.w700)}</b></small><small title="Vent max à ~700 m (925 hPa), km/h">700<span class="x">m</span> <b>${dy.w925==null?"–":Math.round(dy.w925)}</b></small><small title="Pression moyenne au niveau de la mer, tendance 04h→20h"><span class="x">P </span><b>${dy.pm==null?"–":Math.round(dy.pm)}</b><span class="x"> </span>${arrow}<span class="x"> ${dy.dp>0?"+":""}${Math.round(dy.dp)}</span></small>
       <small class="x">T–Td ${Math.round(dy.sp*10)/10}°</small><small class="x">${Math.round(dy.pr*10)/10} mm</small>`;
     b.onclick=()=>{const n=S.data.time.length;const same=S.range&&S.range[0]===dy.start;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];if(!same)S.synI=dy.start+12;render()};
     box.appendChild(b);
@@ -435,10 +474,7 @@ function drawLinks(){
   const sp=spot();
   $("links").innerHTML=`<a href="https://spotwx.com/products/grib_index.php?model=gfs_pgrb2_0p25_f&lat=${sp.lat}&lon=${sp.lon}&tz=America/Argentina/Buenos_Aires&label=${encodeURIComponent(sp.name)}" target="_blank" rel="noopener">SpotWx GFS ↗</a>
   <a href="https://spotwx.com/products/grib_index.php?model=ecmwf_ifs&lat=${sp.lat}&lon=${sp.lon}&tz=America/Argentina/Buenos_Aires&label=${encodeURIComponent(sp.name)}" target="_blank" rel="noopener">SpotWx ECMWF ↗</a>
-  <a href="https://www.windy.com/${sp.lat}/${sp.lon}?700h,${sp.lat},${sp.lon},10" target="_blank" rel="noopener">Windy 700 hPa ↗</a>
-  <a href="https://www.windy.com/-50/-75?pressure,-50,-75,4" target="_blank" rel="noopener">Windy pression ↗</a>
-  <a href="https://www.tropicaltidbits.com/analysis/models/?model=gfs&region=samer&pkg=z500_mslp" target="_blank" rel="noopener">500 hPa + pression (TT) ↗</a>
-  <a href="https://www.pataclimb.com/knowledge/weather.html" target="_blank" rel="noopener">Guide météo pataclimb ↗</a>`;
+  <a href="https://www.windy.com/${sp.lat}/${sp.lon}?700h,${sp.lat},${sp.lon},10" target="_blank" rel="noopener">Windy 700 hPa ↗</a>`;
 }
 function render(suffix){
   if(!S.data)return;
@@ -458,6 +494,7 @@ $("m-gfs").onclick=()=>{S.model="gfs";savePrefs();render()};
 $("m-ecmwf").onclick=()=>{S.model="ecmwf";savePrefs();render()};
 $("all").onclick=()=>{S.range=null;render()};
 $("refresh").onclick=()=>{load(true);loadSyn(true)};
+$("windy-d").ontoggle=e=>{const b=$("windy-box");if(e.target.open&&!b.firstChild){const sp=spot();b.innerHTML=`<iframe loading="lazy" title="Windy pression" src="https://embed.windy.com/embed2.html?lat=-50&lon=-75&detailLat=${sp.lat}&detailLon=${sp.lon}&zoom=3&level=surface&overlay=pressure&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=true&type=map&metricWind=km%2Fh&metricTemp=%C2%B0C"></iframe>`}};
 $("syn-t").oninput=e=>drawSyn(+e.target.value);
 [["t-ok","ok"],["t-max","max"],["t-dry","dry"]].forEach(([id,k])=>{$(id).value=S.th[k];$(id).onchange=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.th[k]=v;savePrefs();render()}}});
 let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>render(),150)});
