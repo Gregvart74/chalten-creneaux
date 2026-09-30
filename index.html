@@ -155,9 +155,9 @@ details summary{cursor:pointer;font-weight:600}
       </div>
       <div>
         <h3>Fonds et repères</h3>
-        <p><i class="zone" style="background:var(--go-bg)"></i><b>Vert</b> — vent ≤ <span class="th-ok">30</span> km/h : confortable.</p>
-        <p><i class="zone" style="background:var(--warn-bg)"></i><b>Orange</b> — <span class="th-ok">30</span> à <span class="th-max">50</span> km/h : limite.</p>
-        <p><i class="zone" style="background:var(--no-bg)"></i><b>Rouge</b> — plus de <span class="th-max">50</span> km/h : non. Réglables dans « Seuils et lecture ».</p>
+        <p><i class="zone" style="background:var(--go-bg)"></i><b>Vert</b> — vent ≤ <span class="th-ok">40</span> km/h : confortable.</p>
+        <p><i class="zone" style="background:var(--warn-bg)"></i><b>Orange</b> — <span class="th-ok">40</span> à <span class="th-max">60</span> km/h : limite.</p>
+        <p><i class="zone" style="background:var(--no-bg)"></i><b>Rouge</b> — plus de <span class="th-max">60</span> km/h : non. Réglables dans « Seuils et lecture ».</p>
         <p><i class="vline dot"></i><b>Pointillé vertical</b> — maintenant.</p>
         <p><i class="vline"></i><b>Trait vertical plein</b> — curseur : les valeurs s'affichent dans la bulle.</p>
         <p><i class="vline thin"></i><b>Traits fins</b> — minuit, début de chaque jour.</p>
@@ -239,8 +239,8 @@ details summary{cursor:pointer;font-weight:600}
         <div>
           <h3>Seuils</h3>
           <div class="th">
-            <label for="t-ok">Vent 700 confort ≤</label><input id="t-ok" type="number" inputmode="numeric" value="30">
-            <label for="t-max">Vent 700 max ≤</label><input id="t-max" type="number" inputmode="numeric" value="50">
+            <label for="t-ok">Vent 700 confort ≤</label><input id="t-ok" type="number" inputmode="numeric" value="40">
+            <label for="t-max">Vent 700 max ≤</label><input id="t-max" type="number" inputmode="numeric" value="60">
             <label for="t-dry">Écart T–Td sec ≥</label><input id="t-dry" type="number" inputmode="decimal" value="5">
           </div>
         </div>
@@ -268,10 +268,15 @@ const VARS=["wind_speed_850hPa","wind_speed_10m","wind_gusts_10m","wind_speed_70
 const TZ="America/Argentina/Rio_Gallegos";
 const JOURS=["dim","lun","mar","mer","jeu","ven","sam"];
 const NS="http://www.w3.org/2000/svg";
-const S={spot:"fitz",model:"ecmwf",range:null,data:null,fetched:null,th:{ok:30,max:50,dry:5}};
+const S={spot:"fitz",model:"ecmwf",range:null,data:null,fetched:null,th:{ok:40,max:60,dry:5}};
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-Object.assign(S,store.get("prefs")||{}); if(S.pv!==2){S.model="ecmwf";S.pv=2} S.range=null; // pv2: ECMWF by default (GFS underestimates wind over the massif) S.th=Object.assign({ok:30,max:50,dry:5},S.th);
+Object.assign(S,store.get("prefs")||{}); S.range=null; S.th=Object.assign({ok:40,max:60,dry:5},S.th);
+// Pref migrations. pv2: ECMWF by default (GFS underestimates wind over the massif).
+// pv3: wind thresholds 30/50 → 40/60, calibrated on dated ascents 2022–2026 (kept if the user had changed them).
+if(!(S.pv>=2)){S.model="ecmwf"}
+if(!(S.pv>=3)&&S.th.ok===30&&S.th.max===50){S.th.ok=40;S.th.max=60}
+S.pv=3;
 const savePrefs=()=>store.set("prefs",{spot:S.spot,model:S.model,th:S.th,pv:S.pv});
 
 const $=id=>document.getElementById(id);
