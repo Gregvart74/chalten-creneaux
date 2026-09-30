@@ -49,6 +49,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .day{min-width:0;border-radius:8px;padding:7px 8px;display:flex;flex-direction:column;gap:1px;text-align:left;border:1px solid transparent}
 .day small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .day small.why{white-space:normal;font-family:var(--f-body);line-height:1.25}
+.day small.hum{color:var(--warn);font-family:var(--f-body);font-weight:600}
 .day small b{font-size:inherit;color:var(--fg)}
 .why{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
 .why h3{margin:0 0 4px;font-size:16px}
@@ -441,7 +442,7 @@ function days(model){
 }
 const CRIT_TXT={wind:d=>`vent ${Math.round(d.w700)} km/h`,rain:d=>`pluie ${Math.round(d.pr*10)/10} mm`,cloud:()=>"couvert"};
 function mainReason(dy){ // worst criterion; wind first on ties
-  if(dy.v===0) return "calme et sec";
+  if(dy.v===0) return "calme, sans pluie";
   const k=["wind","rain","cloud"].find(k=>dy.crit[k]===dy.v);return CRIT_TXT[k](dy);
 }
 
@@ -552,11 +553,12 @@ function drawDays(){
   list.forEach(dy=>{
     const o=oth[dy.k],v=o?Math.max(dy.v,o.v):dy.v;
     // reason comes from the model that drives the (prudent) verdict
+    const fh=Math.max(dy.sat,o?o.sat:0); // hours with T–Td < 2° between 8h and 18h, worst model
     const why=o&&o.v>dy.v?`${other(S.model).toUpperCase()} : ${mainReason(o)}`:mainReason(dy);
     const dt=new Date(dy.k+"T12:00:00Z");
     const b=document.createElement("button");b.className="day "+CLS[v];
     b.setAttribute("aria-pressed",S.sel===dy.k?"true":"false");
-    b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[v]}</span><small class="why">${why}</small>`;
+    b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[v]}</span><small class="why">${why}</small>${fh?`<small class="hum" title="Air saturé (T–Td &lt; 2°) entre 8h et 18h : brume ou nuages bas. Ne change pas le verdict.">humide ${fh} h</small>`:""}`;
     b.onclick=()=>{S.sel=dy.k;S.synI=dy.start+12;render()}; // detail + map follow the day; charts keep the 10-day view
     box.appendChild(b);
   });
@@ -566,7 +568,7 @@ function drawWhy(a,b){
   const box=$("why");if(!a){box.innerHTML="";return}
   const A=S.model.toUpperCase(),B=other(S.model).toUpperCase(),th=S.th,f=v=>v==null?"–":Math.round(v),f1=v=>v==null?"–":Math.round(v*10)/10;
   const v=b?Math.max(a.v,b.v):a.v,dt=new Date(a.k+"T12:00:00Z");
-  const cell=(dy,key,val)=>`<td class="${dy&&key?CLS[dy.crit[key]]:""}">${dy?val(dy):"–"}</td>`;
+  const cell=(dy,key,val)=>`<td class="${!dy?"":key==="fog"?(dy.sat?"warn":""):key?CLS[dy.crit[key]]:""}">${dy?val(dy):"–"}</td>`;
   const row=(lbl,key,val,rule)=>`<tr><th>${lbl}</th>${cell(a,key,val)}${cell(b,key,val)}<td class="rule">${rule}</td></tr>`;
   const arrow=dy=>dy.dp>2?"↑":dy.dp<-2?"↓":"→";
   // sentence
@@ -576,7 +578,7 @@ function drawWhy(a,b){
   const pmx=Math.max(a.pm||0,b&&b.pm||0),pdp=a.dp;
   if(pmx>=1020) txt+=` Signe positif : pression haute (${f(a.pm)} hPa, ${pdp>2?"en hausse":pdp<-2?"en baisse":"stable"}), régime anticyclonique.`;
   const warn=[];
-  const fog=[a,b].filter(Boolean).filter(d=>d.sat>=3);
+  const fog=[a,b].filter(Boolean).filter(d=>d.sat>=1);
   if(fog.length)warn.push(`Brume ou nuages bas possibles (${fog.map(d=>(d===a?A:B)+" "+d.sat+" h").join(", ")} entre 8h et 18h)${pmx>=1020?" : avec la pression haute, sans doute une mer de nuages sous les sommets":""}.`);const up=Math.max(a.wup||0,b&&b.wup||0);if(up>=60&&v<2)warn.push(`vent fort qui arrive du Pacifique (${f(up)} km/h à 3000 m) : le massif pourrait être plus venté que prévu.`);
   box.innerHTML=`<h3>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1} — <span style="color:var(--${CLS[v]})">${LBL[v]}</span></h3>
   <p>${txt}</p>${warn.length?`<p class="warn">⚠ ${warn.join(" ")}</p>`:""}
@@ -585,7 +587,7 @@ function drawWhy(a,b){
   ${row("Pluie / neige","rain",d=>f1(d.pr)+" mm",`limite ≥ 0,2, non ≥ 1`)}
   ${row("Nuages moyens","cloud",d=>f(d.cm)+" %","≥ 80 % = couvert")}
   <tr class="info"><th colspan="4">Pour info (hors verdict)</th></tr>
-  ${row("Brume / nuages bas",null,d=>d.sat+" h","air saturé au sol du modèle, 8h–18h")}
+  ${row("Humidité (air saturé)","fog",d=>d.sat+" h","T–Td &lt; 2°, 8h–18h : brume, nuages bas")}
   ${row("Rafales El Chaltén",null,d=>f(d.vg)+" km/h","vent au sol, village")}
   ${row("Pression moyenne",null,d=>`${f(d.pm)} ${arrow(d)}`,"&gt; 1020 et ↑ = bon signe")}
   ${row("Vent Pacifique ~3000 m",null,d=>f(d.wup)+" km/h","vent qui arrive")}
