@@ -44,8 +44,11 @@ button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(
 .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
-.days{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity}
-.day{flex:0 0 132px;scroll-snap-align:start;border-radius:8px;padding:9px 10px;display:flex;flex-direction:column;gap:2px;text-align:left;border:1px solid transparent}
+.days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+@media (min-width:860px){.days{grid-template-columns:repeat(10,minmax(0,1fr))}}
+.day{min-width:0;border-radius:8px;padding:7px 8px;display:flex;flex-direction:column;gap:1px;text-align:left;border:1px solid transparent}
+.day small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:599px){.day{padding:6px 5px}.day b{font-size:12.5px}.day .v{font-size:12px}.day small{font-size:10.5px}.day .x{display:none}}
 .day[aria-pressed="true"]{border-color:var(--fg)}
 .day b{font-size:14px}
 .day .v{font-weight:800;font-size:13px}
@@ -67,6 +70,15 @@ details summary{cursor:pointer;font-weight:600}
 .guide h3{font-size:14px;margin:0 0 3px}
 .guide p{margin:0;color:var(--muted);font-size:14px;max-width:65ch}
 .err{color:var(--no);font-size:14px}
+.syn{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:760px){.syn{grid-template-columns:1fr}}
+#syn-map{width:100%;height:auto;display:block;border-radius:6px;background:var(--bg)}
+.syn-ctl{display:flex;align-items:center;gap:10px;margin-top:8px;font-family:var(--f-mono);font-size:12px}
+.syn-ctl input{flex:1}
+.syn-scale{height:8px;border-radius:4px;margin:6px 0 2px;background:linear-gradient(90deg,#3b5ba5 0%,#6f9fd8 20%,#cfe0ee 44%,#f3e3c3 60%,#e9a15a 80%,#c4452c 100%)}
+.syn-scale+div{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.syn p{margin:0 0 8px;color:var(--muted);font-size:14px;max-width:60ch}
+.syn b{color:var(--fg)}
 .th{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;font-size:13px}
 .th label{color:var(--muted)}
 .th input{width:70px;font:inherit;font-size:14px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
@@ -128,6 +140,22 @@ details summary{cursor:pointer;font-weight:600}
     </div>
   </section>
 
+  <section class="panel">
+    <h2>Situation synoptique — pression au niveau de la mer</h2>
+    <div class="syn">
+      <div>
+        <canvas id="syn-map" width="560" height="520" role="img" aria-label="Carte de pression au niveau de la mer, sud de l'Amérique du Sud"></canvas>
+        <div class="syn-ctl"><input id="syn-t" type="range" min="0" max="239" step="3" aria-label="Échéance de la carte"><span id="syn-lbl">–</span></div>
+      </div>
+      <div>
+        <div class="syn-scale"></div><div><span>985</span><span>1010</span><span>1035 hPa</span></div>
+        <p id="syn-read" style="margin-top:10px">Chargement…</p>
+        <p><b>A</b> anticyclone, <b>D</b> dépression, isobares tous les 4 hPa, le point marque le sommet. Bon signe : pression &gt; 1020 hPa sur la zone et isobares larges (anticyclone posé sur le sud du continent qui bloque le flux d'ouest). Mauvais signe : isobares serrées d'ouest en est, dépressions qui défilent entre 55 et 60°S.</p>
+        <p>La carte suit le jour sélectionné et le curseur des graphes.</p>
+      </div>
+    </div>
+  </section>
+
   <div class="readout" id="ro">Touchez ou survolez un graphe pour lire les valeurs.</div>
 
   <section class="panel">
@@ -144,7 +172,8 @@ details summary{cursor:pointer;font-weight:600}
         </div>
         <div><h3>Vent</h3><p>700 mb ≈ niveau des voies, 850 mb ≈ approche. Bon signal : les deux courbes basses et proches, et la pression qui monte. L'écart entre GFS et ECMWF sur le 700 mb donne la confiance : s'ils divergent, attendre.</p></div>
         <div><h3>Humidité</h3><p>Écart température / rosée &lt; 2 °C : air saturé, nuages, givre, rocher mouillé. ≥ 5 °C avec un vrai cycle jour/nuit : air sec, ciel clair. Courbe plate : ciel couvert.</p></div>
-        <div><h3>Fiabilité</h3><p>Correct jusqu'à J+4/5, indicatif ensuite. Températures 2 m à l'altitude du point modèle (affichée en haut), pas au sommet : voir T700 dans la lecture.</p></div>
+        <div><h3>Direction et pression</h3><p>D'après pataclimb (Garibotti) : le beau temps s'installe au-dessus de 1020 hPa, parfois dès 1000 hPa si les isobares sont très espacées. Vent de S/SO = beau, O/NO = tempête (voir la direction 700 dans la lecture).</p></div>
+        <div><h3>Fiabilité</h3><p>Fiable jusqu'à J+3, indicatif jusqu'à J+5, spéculatif au-delà (sauf gros anticyclone, visible parfois 1–2 semaines avant). Températures 2 m à l'altitude du point modèle (affichée en haut), pas au sommet : voir T700 dans la lecture.</p></div>
       </div>
     </details>
   </section>
@@ -194,6 +223,81 @@ function parse(j){
   const h=j.hourly,out={elev:j.elevation,time:h.time,m:{}};
   for(const m in MODELS){out.m[m]={};for(const v of VARS){out.m[m][v]=h[v+"_"+MODELS[m]]||h.time.map(()=>null)}}
   return out;
+}
+
+// ---------- synoptic map ----------
+// Coastline: Natural Earth 50m land, simplified
+const COAST=[[-58.9,-51.3,-58.9,-51.3],[-73.8,-43.3,-73.8,-43.3],[-69.2,-52.7,-69.2,-52.7],[-39.0,-15.3,-38.9,-15.9,-39.2,-17.2,-39.2,-17.7,-39.6,-18.3,-39.8,-19.6,-41.0,-21.2,-41.0,-22.0,-41.7,-22.3,-42.0,-22.9,-43.0,-23.0,-43.2,-22.7,-43.2,-23.0,-44.6,-23.1,-44.6,-23.3,-45.5,-23.8,-46.0,-23.8,-46.9,-24.2,-48.0,-25.0,-48.2,-25.4,-48.4,-25.3,-48.5,-25.4,-48.7,-25.4,-48.4,-25.6,-48.7,-25.8,-48.7,-26.3,-48.6,-27.2,-48.8,-28.6,-49.7,-29.4,-50.9,-31.3,-52.0,-32.1,-52.1,-31.8,-51.3,-31.5,-50.6,-30.4,-50.6,-30.3,-51.0,-30.4,-51.3,-30.0,-51.2,-30.4,-51.3,-30.8,-52.0,-31.4,-52.2,-31.9,-52.1,-32.2,-52.7,-33.1,-53.4,-33.8,-53.8,-34.4,-54.9,-34.9,-55.7,-34.8,-56.2,-34.9,-57.2,-34.5,-57.8,-34.5,-58.4,-33.7,-58.4,-33.2,-58.1,-33.0,-58.2,-32.5,-58.2,-33.0,-58.4,-33.1,-58.5,-33.7,-58.4,-34.2,-58.5,-34.3,-58.3,-34.7,-57.2,-35.4,-57.4,-35.9,-57.1,-36.3,-56.7,-36.4,-56.7,-37.0,-57.5,-38.1,-58.2,-38.4,-61.1,-39.0,-62.3,-38.8,-62.3,-39.2,-62.1,-39.4,-62.4,-40.2,-62.2,-40.7,-62.4,-40.9,-63.6,-41.2,-64.9,-40.7,-65.1,-40.9,-65.0,-42.1,-64.4,-42.4,-63.8,-42.1,-63.6,-42.7,-64.0,-42.9,-64.5,-42.5,-65.0,-42.7,-64.3,-43.0,-65.3,-43.6,-65.3,-44.4,-65.6,-44.7,-65.6,-45.0,-66.2,-45.0,-66.9,-45.3,-67.6,-46.1,-67.5,-46.4,-66.8,-47.0,-65.9,-47.2,-65.8,-47.6,-66.2,-47.8,-65.8,-47.9,-67.5,-49.0,-67.9,-50.0,-68.3,-50.1,-68.7,-49.8,-68.7,-49.9,-69.0,-50.0,-68.4,-50.2,-68.9,-50.4,-69.4,-51.0,-69.2,-51.0,-69.1,-51.5,-69.5,-51.6,-69.0,-51.7,-68.4,-52.3,-69.2,-52.2,-70.8,-52.8,-71.0,-53.8,-71.3,-53.9,-72.2,-53.6,-72.4,-53.4,-71.9,-53.2,-71.8,-53.5,-71.7,-53.2,-71.3,-53.0,-71.2,-52.8,-72.3,-53.1,-72.5,-53.5,-73.1,-53.2,-72.7,-52.8,-71.5,-52.6,-72.7,-52.5,-73.1,-53.1,-73.6,-52.8,-73.1,-52.5,-74.0,-52.6,-74.3,-52.1,-73.8,-52.2,-72.8,-51.9,-72.6,-52.2,-72.7,-52.4,-72.5,-52.3,-72.5,-51.7,-73.2,-51.5,-72.6,-51.8,-73.5,-52.0,-74.2,-51.7,-73.9,-51.6,-73.9,-51.3,-74.8,-51.1,-75.1,-50.7,-74.7,-50.7,-74.6,-50.4,-73.8,-50.9,-73.7,-50.5,-74.0,-50.8,-74.2,-50.6,-74.0,-50.5,-74.6,-50.2,-74.3,-50.0,-74.0,-50.0,-74.3,-49.8,-74.3,-49.6,-73.8,-49.6,-74.1,-49.4,-73.9,-49.0,-74.2,-49.5,-74.4,-49.4,-74.3,-48.6,-74.0,-48.5,-74.5,-48.5,-74.6,-48.0,-73.4,-48.1,-73.7,-47.7,-74.2,-48.0,-74.7,-47.7,-74.1,-47.6,-74.5,-47.4,-74.2,-47.2,-74.3,-46.8,-75.0,-46.7,-75.0,-46.5,-75.5,-46.7,-75.4,-46.9,-75.7,-46.7,-74.9,-46.2,-75.1,-45.9,-74.2,-45.8,-74.0,-45.4,-73.8,-45.4,-74.0,-46.1,-74.4,-46.2,-74.0,-46.2,-73.7,-45.8,-73.8,-46.6,-73.6,-45.9,-73.7,-45.5,-72.9,-45.5,-73.4,-45.2,-73.4,-45.1,-72.7,-44.6,-72.7,-44.4,-73.3,-44.2,-73.0,-43.6,-73.1,-43.3,-72.8,-43.0,-72.8,-42.7,-72.6,-42.5,-72.8,-42.3,-72.4,-42.4,-72.5,-42.0,-72.8,-41.9,-72.3,-41.5,-72.5,-41.7,-73.0,-41.5,-73.5,-41.8,-73.7,-41.7,-73.6,-41.6,-74.0,-41.1,-73.7,-40.0,-73.4,-39.8,-73.2,-39.2,-73.5,-38.5,-73.7,-37.3,-73.6,-37.2,-73.2,-37.2,-72.6,-35.6,-72.2,-35.1,-72.0,-34.2,-71.7,-33.7,-71.7,-33.1,-71.5,-32.7,-71.7,-30.6,-71.3,-29.7,-71.5,-28.9,-70.9,-27.6,-70.6,-26.3,-70.7,-25.8,-70.5,-25.3,-70.6,-24.6,-70.4,-23.6,-70.6,-23.3,-70.3,-22.8,-70.1,-21.5,-70.2,-19.7,-70.4,-18.4,-71.3,-17.7,-71.4,-17.4,-73.8,-16.2,-75.4,-15.1]];
+const SYN={W:-100,E:-50,S:-65,N:-30,step:5};
+SYN.lats=[];for(let v=SYN.N;v>=SYN.S;v-=SYN.step)SYN.lats.push(v);
+SYN.lons=[];for(let v=SYN.W;v<=SYN.E;v+=SYN.step)SYN.lons.push(v);
+function synUrl(){const la=[],lo=[];SYN.lats.forEach(a=>SYN.lons.forEach(o=>{la.push(a);lo.push(o)}));
+  return "https://api.open-meteo.com/v1/forecast?latitude="+la.join(",")+"&longitude="+lo.join(",")+"&hourly=pressure_msl&models="+Object.values(MODELS).join(",")+"&forecast_days=10&timezone="+encodeURIComponent(TZ)}
+async function loadSyn(force){
+  const c=store.get("syn");
+  if(c){S.syn=c.data;drawSyn()}
+  if(c&&!force&&Date.now()-c.fetched<3*3600e3)return;
+  try{const r=await fetch(synUrl());if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();
+    const out={time:j[0].hourly.time,m:{}};
+    for(const m in MODELS)out.m[m]=j.map(p=>p.hourly["pressure_msl_"+MODELS[m]]);
+    S.syn=out;store.set("syn",{data:out,fetched:Date.now()});drawSyn();
+  }catch(e){if(!S.syn)$("syn-read").textContent="Carte indisponible (réseau)."}
+}
+function synField(i){ // grid [row][col] of MSLP at hour i, null-safe
+  const a=S.syn.m[S.model],nc=SYN.lons.length;
+  return SYN.lats.map((_,r)=>SYN.lons.map((_,c)=>{const s=a[r*nc+c];return s?s[i]:null}));
+}
+function synColor(v){ // 985 → 1035 hPa, blue → sand → red
+  const st=[[985,[59,91,165]],[995,[111,159,216]],[1007,[207,224,238]],[1015,[243,227,195]],[1025,[233,161,90]],[1035,[196,69,44]]];
+  if(v<=st[0][0])return st[0][1];if(v>=st[st.length-1][0])return st[st.length-1][1];
+  for(let k=1;k<st.length;k++)if(v<=st[k][0]){const [a,ca]=st[k-1],[b,cb]=st[k],t=(v-a)/(b-a);return ca.map((x,j)=>x+(cb[j]-x)*t)}
+}
+let synLast=-1;
+function drawSyn(i){
+  if(!S.syn)return;
+  const n=S.syn.time.length;if(i==null)i=S.synI!=null?S.synI:Math.max(0,S.syn.time.findIndex(t=>new Date(t+":00")>new Date(new Date().toLocaleString("en-US",{timeZone:TZ}))));
+  i=Math.max(0,Math.min(n-1,i));S.synI=i;$("syn-t").max=n-1;$("syn-t").value=i;
+  const cv=$("syn-map"),ctx=cv.getContext("2d");
+  const k=Math.cos(47*Math.PI/180),spanX=(SYN.E-SYN.W)*k,spanY=SYN.N-SYN.S;
+  const w=Math.round(Math.min(560,cv.parentElement.clientWidth)*(window.devicePixelRatio>1?2:1)),h=Math.round(w*spanY/spanX);
+  if(cv.width!==w){cv.width=w;cv.height=h}
+  const px=lon=>(lon-SYN.W)*k/spanX*w, py=lat=>(SYN.N-lat)/spanY*h;
+  const F=synField(i),R=SYN.lats.length-1,C=SYN.lons.length-1;
+  const at=(lat,lon)=>{const fr=(SYN.N-lat)/SYN.step,fc=(lon-SYN.W)/SYN.step;const r0=Math.min(R-1,Math.floor(fr)),c0=Math.min(C-1,Math.floor(fc));
+    const tr=fr-r0,tc=fc-c0,g=(r,c)=>F[r][c];const a=g(r0,c0),b=g(r0,c0+1),cc=g(r0+1,c0),d=g(r0+1,c0+1);
+    if(a==null||b==null||cc==null||d==null)return null;return a*(1-tr)*(1-tc)+b*(1-tr)*tc+cc*tr*(1-tc)+d*tr*tc};
+  // field: coarse cells (step px) for speed
+  const st=w>700?3:2,cols=Math.ceil(w/st),rows=Math.ceil(h/st),V=new Float32Array(cols*rows);
+  const img=ctx.createImageData(w,h);
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const lon=SYN.W+(x*st/w)*spanX/k,lat=SYN.N-(y*st/h)*spanY;V[y*cols+x]=at(lat,lon)??NaN}
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    const v=V[y*cols+x];let rgb=isNaN(v)?[128,128,128]:synColor(v);
+    const q=Math.floor(v/4),iso=(x<cols-1&&Math.floor(V[y*cols+x+1]/4)!==q)||(y<rows-1&&Math.floor(V[(y+1)*cols+x]/4)!==q);
+    if(iso)rgb=rgb.map(c=>c*.45);
+    for(let dy=0;dy<st&&y*st+dy<h;dy++)for(let dx=0;dx<st&&x*st+dx<w;dx++){const o=((y*st+dy)*w+x*st+dx)*4;img.data[o]=rgb[0];img.data[o+1]=rgb[1];img.data[o+2]=rgb[2];img.data[o+3]=255}
+  }
+  ctx.putImageData(img,0,0);
+  const u=w/560;
+  // coast
+  ctx.lineWidth=1.4*u;ctx.strokeStyle="rgba(20,28,35,.85)";ctx.fillStyle="rgba(20,28,35,.07)";
+  COAST.forEach(r=>{ctx.beginPath();for(let j=0;j<r.length;j+=2){const X=px(r[j]),Y=py(r[j+1]);j?ctx.lineTo(X,Y):ctx.moveTo(X,Y)}ctx.closePath();ctx.fill();ctx.stroke()});
+  // highs / lows on raw grid
+  ctx.font=`800 ${18*u}px Archivo,system-ui,sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";
+  for(let r=1;r<R;r++)for(let c=1;c<C;c++){const v=F[r][c];if(v==null)continue;let hi=true,lo=true;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;const o=F[r+dr][c+dc];if(o==null)continue;if(o>=v)hi=false;if(o<=v)lo=false}
+    if(hi||lo){const X=px(SYN.lons[c]),Y=py(SYN.lats[r]);ctx.fillStyle=hi?"#8a2412":"#1d3a78";ctx.fillText(hi?"A":"D",X,Y-6*u);
+      ctx.font=`500 ${11*u}px "IBM Plex Mono",monospace`;ctx.fillText(Math.round(v),X,Y+9*u);ctx.font=`800 ${18*u}px Archivo,system-ui,sans-serif`}}
+  // Chaltén
+  const sp=spot(),cx=px(sp.lon),cy=py(sp.lat);ctx.beginPath();ctx.arc(cx,cy,5*u,0,7);ctx.fillStyle="#fff";ctx.fill();ctx.lineWidth=2.5*u;ctx.strokeStyle="#111";ctx.stroke();
+  // label + readout
+  const T=S.syn.time[i],dt=new Date(T.slice(0,10)+"T12:00:00Z");
+  $("syn-lbl").textContent=`${JOURS[dt.getUTCDay()]} ${T.slice(8,10)}/${T.slice(5,7)} ${T.slice(11,13)}h`;
+  const pw=at(-50,-80),pe=at(-50,-65),pn=at(-45,-75),ps=at(-55,-75),pc=at(sp.lat,sp.lon);
+  const f=v=>v==null?"–":Math.round(v),sg=v=>v==null?"–":(v>0?"+":"")+Math.round(v);
+  const g=pn!=null&&ps!=null?pn-ps:null;
+  // Indicative regime (thresholds are our own, to be calibrated on past windows)
+  const reg=g==null||pc==null?null:pc<1005?["Dépression proche","no"]:(pc>=1020&&g<8)?["Anticyclonique","go"]:g>=15?["Flux d'ouest fort","no"]:g>=8?["Flux d'ouest modéré","warn"]:["Gradient faible","fg"];
+  $("syn-read").innerHTML=`${reg?`<b style="color:var(--${reg[1]})">${reg[0]}</b> · `:""}<b>${f(pc)} hPa</b> au sommet<br>Écart N→S (45°S − 55°S) ${sg(g)} hPa · Pacifique→Atlantique à 50°S ${sg(pw!=null&&pe!=null?pw-pe:null)} hPa · ${S.model.toUpperCase()}<br><small>Régime indicatif (nos seuils, à calibrer) : dépression si &lt; 1005 hPa au sommet ; flux d'ouest fort si écart N→S ≥ 15 hPa, modéré ≥ 8.</small>`;
 }
 
 // ---------- analysis ----------
@@ -306,10 +410,11 @@ function hover(svg,H,top,bot){
 }
 function showAt(i){
   const x=xs();cursorLines=cursorLines.filter(l=>l.isConnected);cursorLines.forEach(l=>{l.setAttribute("x1",x(i));l.setAttribute("x2",x(i));l.setAttribute("opacity",.45)});
+  if(S.syn&&i!==S.synI)drawSyn(i);
   const d=S.data.m[S.model],o=S.data.m[other(S.model)],T=S.data.time[i],dt=new Date(T.slice(0,10)+"T12:00:00Z");
-  const f=v=>v==null?"–":Math.round(v);const f1=v=>v==null?"–":(Math.round(v*10)/10);
+  const card=v=>v==null?"":["N","NE","E","SE","S","SO","O","NO"][Math.round(v/45)%8];const f=v=>v==null?"–":Math.round(v);const f1=v=>v==null?"–":(Math.round(v*10)/10);
   const sp=(d.temperature_2m[i]!=null&&d.dew_point_2m[i]!=null)?f1(d.temperature_2m[i]-d.dew_point_2m[i]):"–";
-  $("ro").textContent=`${JOURS[dt.getUTCDay()]} ${T.slice(8,10)}/${T.slice(5,7)} ${T.slice(11,13)}h · 700: ${f(d.wind_speed_700hPa[i])} km/h (${other(S.model).toUpperCase()} ${f(o.wind_speed_700hPa[i])}) · 850: ${f(d.wind_speed_850hPa[i])} · ${f1(d.pressure_msl[i])} hPa · T–Td ${sp}° · T700 ${f(d.temperature_700hPa[i])}° · iso0 ${f(d.freezing_level_height[i])} m · précip ${f1(d.precipitation[i])} mm · nuages bas/moy ${f(d.cloud_cover_low[i])}/${f(d.cloud_cover_mid[i])}%`;
+  $("ro").textContent=`${JOURS[dt.getUTCDay()]} ${T.slice(8,10)}/${T.slice(5,7)} ${T.slice(11,13)}h · 700: ${f(d.wind_speed_700hPa[i])} km/h ${card(d.wind_direction_700hPa[i])} (${other(S.model).toUpperCase()} ${f(o.wind_speed_700hPa[i])}) · 850: ${f(d.wind_speed_850hPa[i])} · ${f1(d.pressure_msl[i])} hPa · T–Td ${sp}° · T700 ${f(d.temperature_700hPa[i])}° · iso0 ${f(d.freezing_level_height[i])} m · précip ${f1(d.precipitation[i])} mm · nuages bas/moy ${f(d.cloud_cover_low[i])}/${f(d.cloud_cover_mid[i])}%`;
 }
 
 function drawDays(){
@@ -320,9 +425,9 @@ function drawDays(){
     b.setAttribute("aria-pressed",S.range&&S.range[0]===dy.start?"true":"false");
     const arrow=dy.dp>2?"↑":dy.dp<-2?"↓":"→";
     b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[dy.v]}</span>
-      <small>700 max ${Math.round(dy.w700)} km/h</small><small>P ${arrow} ${dy.dp>0?"+":""}${Math.round(dy.dp)} hPa</small>
-      <small>T–Td min ${Math.round(dy.sp*10)/10}°</small><small>précip ${Math.round(dy.pr*10)/10} mm</small>`;
-    b.onclick=()=>{const n=S.data.time.length;const same=S.range&&S.range[0]===dy.start;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];render()};
+      <small title="Vent 700 mb max">${Math.round(dy.w700)} km/h</small><small title="Tendance pression">P ${arrow}<span class="x"> ${dy.dp>0?"+":""}${Math.round(dy.dp)} hPa</span></small>
+      <small class="x">T–Td ${Math.round(dy.sp*10)/10}°</small><small class="x">${Math.round(dy.pr*10)/10} mm</small>`;
+    b.onclick=()=>{const n=S.data.time.length;const same=S.range&&S.range[0]===dy.start;S.range=same?null:[Math.max(0,dy.start-6),Math.min(n-1,dy.start+54)];if(!same)S.synI=dy.start+12;render()};
     box.appendChild(b);
   });
 }
@@ -330,7 +435,10 @@ function drawLinks(){
   const sp=spot();
   $("links").innerHTML=`<a href="https://spotwx.com/products/grib_index.php?model=gfs_pgrb2_0p25_f&lat=${sp.lat}&lon=${sp.lon}&tz=America/Argentina/Buenos_Aires&label=${encodeURIComponent(sp.name)}" target="_blank" rel="noopener">SpotWx GFS ↗</a>
   <a href="https://spotwx.com/products/grib_index.php?model=ecmwf_ifs&lat=${sp.lat}&lon=${sp.lon}&tz=America/Argentina/Buenos_Aires&label=${encodeURIComponent(sp.name)}" target="_blank" rel="noopener">SpotWx ECMWF ↗</a>
-  <a href="https://www.windy.com/${sp.lat}/${sp.lon}?700h,${sp.lat},${sp.lon},10" target="_blank" rel="noopener">Windy 700 hPa ↗</a>`;
+  <a href="https://www.windy.com/${sp.lat}/${sp.lon}?700h,${sp.lat},${sp.lon},10" target="_blank" rel="noopener">Windy 700 hPa ↗</a>
+  <a href="https://www.windy.com/-50/-75?pressure,-50,-75,4" target="_blank" rel="noopener">Windy pression ↗</a>
+  <a href="https://www.tropicaltidbits.com/analysis/models/?model=gfs&region=samer&pkg=z500_mslp" target="_blank" rel="noopener">500 hPa + pression (TT) ↗</a>
+  <a href="https://www.pataclimb.com/knowledge/weather.html" target="_blank" rel="noopener">Guide météo pataclimb ↗</a>`;
 }
 function render(suffix){
   if(!S.data)return;
@@ -339,7 +447,7 @@ function render(suffix){
   $("meta").textContent=`${spot().name} · ${S.model.toUpperCase()} · point modèle ${Math.round(S.data.elev)} m · MAJ il y a ${age<60?age+" min":Math.round(age/60)+" h"}${suffix||""}`;
   $("m-gfs").setAttribute("aria-pressed",S.model==="gfs");$("m-ecmwf").setAttribute("aria-pressed",S.model==="ecmwf");
   $("all").hidden=!S.range;
-  drawDays();drawWind();drawHum();drawSky();drawLinks();
+  drawDays();drawWind();drawHum();drawSky();drawLinks();drawSyn();
 }
 
 // ---------- controls ----------
@@ -349,10 +457,11 @@ $("spot").onchange=e=>{S.spot=e.target.value;S.range=null;S.data=null;savePrefs(
 $("m-gfs").onclick=()=>{S.model="gfs";savePrefs();render()};
 $("m-ecmwf").onclick=()=>{S.model="ecmwf";savePrefs();render()};
 $("all").onclick=()=>{S.range=null;render()};
-$("refresh").onclick=()=>load(true);
+$("refresh").onclick=()=>{load(true);loadSyn(true)};
+$("syn-t").oninput=e=>drawSyn(+e.target.value);
 [["t-ok","ok"],["t-max","max"],["t-dry","dry"]].forEach(([id,k])=>{$(id).value=S.th[k];$(id).onchange=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.th[k]=v;savePrefs();render()}}});
 let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>render(),150)});
-load();
+load();loadSyn();
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
