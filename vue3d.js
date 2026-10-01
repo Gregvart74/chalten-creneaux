@@ -37,9 +37,9 @@ export async function mount(el,{base="3d/"}={}){
     return((g(i,j)*(1-fu)+g(i+1,j)*fu)*(1-fv)+(g(i,j+1)*(1-fu)+g(i+1,j+1)*fu)*fv)/1000*EXAG};
 
   // ---------- renderer, camera, controls ----------
-  const renderer=new THREE.WebGLRenderer({antialias:!phone,powerPreference:"high-performance"});
+  const renderer=new THREE.WebGLRenderer({antialias:!phone,powerPreference:"high-performance",precision:"highp"});
   renderer.setPixelRatio(Math.min(devicePixelRatio,phone?1.5:2));
-  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=phone?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.outputColorSpace=THREE.SRGBColorSpace;
   el.appendChild(renderer.domElement);
   const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x8fb8dd,0.01);
@@ -50,9 +50,9 @@ export async function mount(el,{base="3d/"}={}){
   const controls=new OrbitControls(camera,renderer.domElement);
   controls.target.copy(target);controls.enableDamping=true;controls.zoomSpeed=2.4;controls.rotateSpeed=0.8;
   controls.minDistance=3;controls.maxDistance=55;controls.maxPolarAngle=Math.PI*0.48;
-  // Phone: vertical swipes keep scrolling the page; horizontal swipe turns around the massif, pinch zooms
+  // Touch: one finger turns, two fingers zoom; the page does not scroll while the finger is on the 3D
   controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_ROTATE};
-  renderer.domElement.style.touchAction="pan-y";
+  renderer.domElement.style.touchAction="none";
 
   // ---------- terrain ----------
   const geo=new THREE.PlaneGeometry(SX,SZ,phone?255:383,phone?133:200);geo.rotateX(-Math.PI/2);
@@ -74,7 +74,7 @@ export async function mount(el,{base="3d/"}={}){
   // ---------- clouds ----------
   const PUFFS=[texPuff(),texPuff(),texPuff()];
   const layer=(n,y0,y1,s0,s1,max)=>{const g=new THREE.Group();g.userData.max=max;
-    for(let k=0;k<n;k++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:PUFFS[k%3],transparent:true,depthWrite:false,opacity:0,fog:true}));
+    for(let k=0;k<n;k++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:PUFFS[k%3],transparent:true,depthWrite:false,opacity:0,fog:true,alphaTest:0.01}));
       const sc=s0+Math.random()*(s1-s0);s.scale.set(sc*1.8,sc*0.8,1);
       s.position.set((Math.random()-.5)*SX*1.3,y0+Math.random()*(y1-y0),(Math.random()-.5)*SZ*1.3);s.userData.r=Math.random();g.add(s)}
     scene.add(g);return g};
@@ -87,7 +87,7 @@ export async function mount(el,{base="3d/"}={}){
     const b=k*4;widx.push(b,b+1,b+2,b+1,b+3,b+2);
     wcol.set([1,1,1,1, 1,1,1,1, 0.6,0.8,1,0, 0.6,0.8,1,0],k*16)}
   const wgeo=new THREE.BufferGeometry();wgeo.setAttribute("position",new THREE.BufferAttribute(wpos,3));wgeo.setAttribute("color",new THREE.BufferAttribute(wcol,4));wgeo.setIndex(widx);
-  const wmat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,fog:false,toneMapped:false,blending:THREE.AdditiveBlending});
+  const wmat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,fog:false,toneMapped:false});
   const wmesh=new THREE.Mesh(wgeo,wmat);wmesh.frustumCulled=false;scene.add(wmesh);
   const wdir=new THREE.Vector3(),wview=new THREE.Vector3(),wperp=new THREE.Vector3();
 
@@ -95,7 +95,7 @@ export async function mount(el,{base="3d/"}={}){
   const NP=phone?2500:4000,ppos=new Float32Array(NP*3),pcol=new Float32Array(NP*3);
   for(let k=0;k<NP;k++){ppos[k*3]=(Math.random()-.5)*SX;ppos[k*3+1]=Math.random()*6;ppos[k*3+2]=(Math.random()-.5)*SZ}
   const pgeo=new THREE.BufferGeometry();pgeo.setAttribute("position",new THREE.BufferAttribute(ppos,3));pgeo.setAttribute("color",new THREE.BufferAttribute(pcol,3));
-  const pmat=new THREE.PointsMaterial({size:0.05,map:texDot(),vertexColors:true,transparent:true,opacity:0,depthWrite:false});scene.add(new THREE.Points(pgeo,pmat));
+  const pmat=new THREE.PointsMaterial({size:0.05,map:texDot(),vertexColors:true,transparent:true,opacity:0,depthWrite:false,alphaTest:0.01});scene.add(new THREE.Points(pgeo,pmat));
 
   // ---------- labels ----------
   const lbox=document.createElement("div");lbox.className="v3-labels";el.appendChild(lbox);
@@ -147,7 +147,8 @@ export async function mount(el,{base="3d/"}={}){
       if(Math.hypot(x-camera.position.x,yy-camera.position.y,z-camera.position.z)<3){wpos.fill(0,k*12,k*12+12);continue}
       // width grows with distance so streaks keep a few pixels on screen
       wview.set(x-camera.position.x,yy-camera.position.y,z-camera.position.z);const dist=wview.length();
-      wperp.crossVectors(wdir,wview).normalize().multiplyScalar(Math.min(0.045,0.0028*dist*(phone?1.3:1)));
+      wperp.crossVectors(wdir,wview);if(wperp.lengthSq()<1e-6){wpos.fill(0,k*12,k*12+12);continue}
+      wperp.normalize().multiplyScalar(Math.min(0.045,0.0028*dist*(phone?1.3:1)));
       const tx=x-W.dx*len,tz=z-W.dz*len;
       wpos.set([x+wperp.x,yy+wperp.y,z+wperp.z, x-wperp.x,yy-wperp.y,z-wperp.z, tx+wperp.x,yy+wperp.y,tz+wperp.z, tx-wperp.x,yy-wperp.y,tz-wperp.z],k*12)}
     wgeo.attributes.position.needsUpdate=true;
