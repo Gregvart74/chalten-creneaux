@@ -18,12 +18,14 @@ function sunPos(dateUTC,lat,lon){
   const az=Math.atan2(-Math.sin(H),Math.tan(dec)*Math.cos(lat*rad)-Math.sin(lat*rad)*Math.cos(H)); // from north, clockwise
   return {alt,az};
 }
+// iOS WebKit generates garbage mipmaps for sRGB textures (coloured blotches): white sprite textures need neither
+function noMip(t){t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;return t}
 function texPuff(){const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d");
   for(let k=0;k<7;k++){const px=40+Math.random()*48,py=44+Math.random()*40,r=26+Math.random()*26,g=x.createRadialGradient(px,py,0,px,py,r);
     g.addColorStop(0,"rgba(255,255,255,.55)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,128,128)}
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t}
+  return noMip(new THREE.CanvasTexture(c))}
 function texDot(){const c=document.createElement("canvas");c.width=c.height=32;const x=c.getContext("2d"),g=x.createRadialGradient(16,16,0,16,16,16);
-  g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(.5,"rgba(255,255,255,.6)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,32,32);return new THREE.CanvasTexture(c)}
+  g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(.5,"rgba(255,255,255,.6)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,32,32);return noMip(new THREE.CanvasTexture(c))}
 
 export async function mount(el,{base="3d/"}={}){
   const phone=matchMedia("(max-width:599px)").matches;
@@ -60,6 +62,8 @@ export async function mount(el,{base="3d/"}={}){
   geo.computeVertexNormals();
   const sat=await new THREE.TextureLoader().loadAsync(base+"sat.jpg");
   sat.colorSpace=THREE.SRGBColorSpace;sat.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  const iOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(iOS)noMip(sat); // same WebKit sRGB-mipmap bug
   const terrain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:sat,roughness:0.95,metalness:0}));
   terrain.castShadow=terrain.receiveShadow=true;scene.add(terrain);
   const skirt=new THREE.Mesh(new THREE.BoxGeometry(SX,0.3,SZ),new THREE.MeshStandardMaterial({color:0x1a2229}));skirt.position.y=-0.16;scene.add(skirt);
