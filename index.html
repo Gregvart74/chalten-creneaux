@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: mobile-first single column — controls, day verdict strip, three stacked charts, guide */
@@ -49,9 +50,26 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .day{min-width:0;border-radius:8px;padding:7px 8px;display:flex;flex-direction:column;gap:1px;text-align:left;border:1px solid transparent}
 .day small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .day small.why{white-space:normal;font-family:var(--f-body);line-height:1.25}
-.day small.hum{color:var(--warn);font-family:var(--f-body);font-weight:600}
+.day small.hum{color:var(--warn);font-family:var(--f-body);font-weight:600;white-space:normal}
 .day small b{font-size:inherit;color:var(--fg)}
-.why{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.why{}
+.v3-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.v3-when{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.v3-box{position:relative;height:480px;border-radius:8px;overflow:hidden;background:#0f161c}
+.v3-box canvas{display:block}
+.v3-msg{position:absolute;inset:0;display:grid;place-items:center;color:#93a3ae;font-size:14px;text-align:center;padding:20px}
+.v3-hud{position:absolute;left:8px;top:8px;z-index:2;background:#0f161cc4;color:#e4eaee;font-family:var(--f-mono);font-size:11.5px;line-height:1.5;
+  padding:6px 9px;border-radius:7px;pointer-events:none;display:none}
+.v3-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.v3-lbl{position:absolute;font-size:11.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000c;transform:translate(-50%,-130%);white-space:nowrap}
+.v3-lbl::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:10px;background:#fffa}
+.v3-lbl.v{font-weight:400;color:#fffc}
+.v3-ctl{display:flex;align-items:center;gap:10px;margin-top:8px}
+.v3-ctl button{width:38px;padding:6px 0}
+.v3-ctl input{flex:1;accent-color:var(--fg)}
+.v3-ctl span{font-family:var(--f-mono);font-size:13px;min-width:3em;text-align:right}
+.v3-note{font-size:11px;color:var(--muted);margin:6px 0 0}
+@media (max-width:599px){.v3-box{height:56vh;min-height:300px}.v3-hud{font-size:10px;padding:4px 7px;line-height:1.4}}
 .why h3{margin:0 0 4px;font-size:16px}
 .why p{margin:0 0 8px;font-size:14px;max-width:70ch}
 .why p.warn{color:var(--warn)}
@@ -154,8 +172,16 @@ details.leg>summary{font-size:13px;color:var(--muted);justify-content:flex-start
     <h2>Verdict par jour (04h–20h, le plus prudent des 2 modèles)</h2>
     <div class="days" id="days"></div>
     <p class="days-note">Touchez un jour pour voir le détail.</p>
-    <div class="why" id="why"></div>
   </section>
+
+  <section class="panel v3" id="v3">
+    <div class="v3-head"><h2>Vue 3D du massif</h2><span class="v3-when" id="v3-when"></span></div>
+    <div class="v3-box" id="v3-box"><div class="v3-msg" id="v3-msg">Chargement de la vue 3D…</div><div class="v3-hud" id="v3-hud"></div></div>
+    <div class="v3-ctl"><button id="v3-play" aria-label="Lecture">▶</button><input id="v3-h" type="range" min="0" max="23" step="1" value="14" aria-label="Heure de la vue 3D"><span id="v3-hl">14h</span></div>
+    <p class="v3-note">Illustration de la prévision (maille ~25 km), pas une simulation face par face. Glisser pour tourner, pincer ou molette pour zoomer. Relief Copernicus GLO-30 (Fitz Roy et Torres recalés à leurs altitudes publiées) · image Sentinel-2 cloudless 2020 par EOX (CC BY-NC-SA 4.0).</p>
+  </section>
+
+  <section class="panel"><div class="why" id="why"></div></section>
 
   <section class="panel">
     <h2>Vent en altitude, au sol, et pression</h2>
@@ -284,7 +310,7 @@ const SPOTS=[
   {id:"chalten",name:"El Chaltén (village)",lat:-49.3314,lon:-72.8866},
 ];
 const MODELS={gfs:"gfs_seamless",ecmwf:"ecmwf_ifs025"};
-const VARS=["wind_speed_850hPa","wind_speed_10m","wind_gusts_10m","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","precipitation","freezing_level_height"];
+const VARS=["wind_speed_850hPa","wind_speed_10m","wind_gusts_10m","wind_speed_700hPa","wind_direction_700hPa","temperature_700hPa","pressure_msl","temperature_2m","dew_point_2m","cloud_cover_low","cloud_cover_mid","cloud_cover_high","precipitation","freezing_level_height"];
 const TZ="America/Argentina/Rio_Gallegos";
 const JOURS=["dim","lun","mar","mer","jeu","ven","sam"];
 const NS="http://www.w3.org/2000/svg";
@@ -311,7 +337,7 @@ const VIL={lat:-49.3314,lon:-72.8866};
 function url(sp){return "https://api.open-meteo.com/v1/forecast?latitude="+sp.lat+","+UP.lat+","+VIL.lat+"&longitude="+sp.lon+","+UP.lon+","+VIL.lon+"&hourly="+VARS.join(",")+"&models="+Object.values(MODELS).join(",")+"&forecast_days=10&timezone="+encodeURIComponent(TZ)}
 
 async function load(force){
-  const sp=spot(), key="fc4-"+sp.id, cached=store.get(key);
+  const sp=spot(), key="fc5-"+sp.id, cached=store.get(key);
   if(cached&&!force&&Date.now()-cached.fetched<3*3600e3){S.data=cached.data;S.fetched=cached.fetched;render();return}
   if(cached){S.data=cached.data;S.fetched=cached.fetched;render()}
   $("meta").textContent="Mise à jour…";
@@ -529,6 +555,7 @@ function hover(svg,H,top,bot){
 function showAt(i,cx,cy){
   const x=xs();cursorLines=cursorLines.filter(l=>l.isConnected);cursorLines.forEach(l=>{l.setAttribute("x1",x(i));l.setAttribute("x2",x(i));l.setAttribute("opacity",.45)});
   if(S.syn&&i!==S.synI)drawSyn(i);
+  if(i!==S.v3i){S.v3i=i;v3Update()}
   const d=S.data.m[S.model],o=S.data.m[other(S.model)],T=S.data.time[i],dt=new Date(T.slice(0,10)+"T12:00:00Z");
   const card=v=>v==null?"":["N","NE","E","SE","S","SO","O","NO"][Math.round(v/45)%8];const f=v=>v==null?"–":Math.round(v);const f1=v=>v==null?"–":(Math.round(v*10)/10);
   const sp=(d.temperature_2m[i]!=null&&d.dew_point_2m[i]!=null)?f1(d.temperature_2m[i]-d.dew_point_2m[i]):"–";
@@ -559,7 +586,7 @@ function drawDays(){
     const b=document.createElement("button");b.className="day "+CLS[v];
     b.setAttribute("aria-pressed",S.sel===dy.k?"true":"false");
     b.innerHTML=`<b>${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1}</b><span class="v">${LBL[v]}</span><small class="why">${why}</small>${fh?`<small class="hum" title="Air saturé (T–Td &lt; 2°) entre 8h et 18h : brume ou nuages bas. Ne change pas le verdict.">humide ${fh} h</small>`:""}`;
-    b.onclick=()=>{S.sel=dy.k;S.synI=dy.start+12;render()}; // detail + map follow the day; charts keep the 10-day view
+    b.onclick=()=>{S.sel=dy.k;S.synI=dy.start+12;const hr=S.data.time[v3Index()]?+S.data.time[v3Index()].slice(11,13):14;const j=S.data.time.findIndex(t=>t.slice(0,10)===dy.k&&+t.slice(11,13)===hr);if(j>=0)S.v3i=j;render()}; // detail + map follow the day; charts keep the 10-day view
     box.appendChild(b);
   });
   drawWhy(list.find(d=>d.k===S.sel),oth[S.sel]);
@@ -607,7 +634,7 @@ function render(suffix){
   $("m-gfs").setAttribute("aria-pressed",S.model==="gfs");$("m-ecmwf").setAttribute("aria-pressed",S.model==="ecmwf");
   $("leg-alt").textContent=`700 mb ${other(S.model).toUpperCase()} (autre modèle)`;
   document.querySelectorAll(".th-ok").forEach(e=>e.textContent=S.th.ok);document.querySelectorAll(".th-max").forEach(e=>e.textContent=S.th.max);
-  drawDays();drawWind();drawHum();drawSky();drawLinks();drawSyn();
+  drawDays();drawWind();drawHum();drawSky();drawLinks();drawSyn();v3Update();
 }
 
 // ---------- controls ----------
@@ -622,6 +649,35 @@ $("windy-d").ontoggle=e=>{const b=$("windy-box");if(e.target.open&&!b.firstChild
 const PHONE=matchMedia("(max-width:599px)").matches;
 document.querySelectorAll("details.fold").forEach(d=>{d.open=!PHONE;d.addEventListener("toggle",()=>{if(d.open)render()})});
 document.addEventListener("pointerdown",e=>{if(!e.target.closest("svg"))$("tip").style.display="none"});
+// ---------- 3D view: loaded when its panel comes on screen; follows the selected day, the hour slider and the chart cursor ----------
+let V3=null,v3Loading=false,v3Play=0;
+function v3Index(){const D=S.data;if(!D)return -1;
+  if(S.v3i==null){ // current hour by day; at night, 14h today so the first view is lit
+    const now=new Date(new Date().toLocaleString("en-US",{timeZone:TZ})),h=now.getHours();
+    S.v3i=Math.max(0,D.time.findIndex(t=>new Date(t+":00")>now)-1);
+    if(h<7||h>20){const k=D.time[S.v3i].slice(0,10),j=D.time.findIndex(t=>t.slice(0,10)===k&&+t.slice(11,13)===14);if(j>=0)S.v3i=j}}
+  return Math.max(0,Math.min(D.time.length-1,S.v3i))}
+function v3Update(){
+  const D=S.data;if(!D)return;const i=v3Index(),T=D.time[i],d=D.m[S.model],o=D.m[other(S.model)];
+  const g=v=>d[v][i]??o[v][i];const hr=+T.slice(11,13),dt=new Date(T.slice(0,10)+"T12:00:00Z");
+  $("v3-h").value=hr;$("v3-hl").textContent=hr+"h";$("v3-when").textContent=`${JOURS[dt.getUTCDay()]} ${dt.getUTCDate()}/${dt.getUTCMonth()+1} · ${hr}h · ${S.model.toUpperCase()}`;
+  if(!V3)return;
+  const r=V3.show({time:T,w700:g("wind_speed_700hPa"),dir700:g("wind_direction_700hPa"),low:g("cloud_cover_low"),mid:g("cloud_cover_mid"),high:g("cloud_cover_high"),precip:g("precipitation"),iso:g("freezing_level_height")});
+  const f=v=>v==null?"–":Math.round(v),card=v=>v==null?"":["N","NE","E","SE","S","SO","O","NO"][Math.round(v/45)%8];
+  const hud=$("v3-hud");hud.style.display="block";
+  hud.innerHTML=`Vent 3000 m ${f(g("wind_speed_700hPa"))} km/h ${card(g("wind_direction_700hPa"))}<br>Nuages bas/moy/hauts ${f(g("cloud_cover_low"))}/${f(g("cloud_cover_mid"))}/${f(g("cloud_cover_high"))} %<br>Précip ${Math.round((g("precipitation")||0)*10)/10} mm/h · iso 0° ${f(g("freezing_level_height"))} m<br>Soleil ${r.sunAlt>0?Math.round(r.sunAlt)+"° au-dessus de l'horizon":"couché"}`;
+}
+async function v3Load(){
+  if(V3||v3Loading)return;v3Loading=true;
+  try{const m=await import("./vue3d.js");V3=await m.mount($("v3-box"));$("v3-msg").remove();v3Update()}
+  catch(e){$("v3-msg").textContent="Vue 3D indisponible sur cet appareil ("+(e&&e.message||e)+").";v3Loading=false}
+}
+// Load right after the page (the panel sits just under the days); the visibility trigger alone proved unreliable on phones
+setTimeout(v3Load,400);
+$("v3-h").oninput=e=>{const D=S.data;if(!D)return;const i=v3Index(),k=D.time[i].slice(0,10);
+  const j=D.time.findIndex(t=>t.slice(0,10)===k&&+t.slice(11,13)===+e.target.value);if(j>=0){S.v3i=j;v3Update()}};
+$("v3-play").onclick=()=>{if(v3Play){clearInterval(v3Play);v3Play=0;$("v3-play").textContent="▶";return}
+  $("v3-play").textContent="❚❚";v3Play=setInterval(()=>{if(!S.data)return;S.v3i=(v3Index()+1)%S.data.time.length;v3Update()},700)};
 $("syn-t").oninput=e=>drawSyn(+e.target.value);
 [["t-ok","ok"],["t-max","max"],["t-dry","dry"]].forEach(([id,k])=>{$(id).value=S.th[k];$(id).onchange=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.th[k]=v;savePrefs();render()}}});
 let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>render(),150)});
