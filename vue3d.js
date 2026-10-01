@@ -18,12 +18,23 @@ function sunPos(dateUTC,lat,lon){
   const az=Math.atan2(-Math.sin(H),Math.tan(dec)*Math.cos(lat*rad)-Math.sin(lat*rad)*Math.cos(H)); // from north, clockwise
   return {alt,az};
 }
-// iOS WebKit generates garbage mipmaps for sRGB textures (coloured blotches): white sprite textures need neither
 function noMip(t){t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;return t}
-function texPuff(){const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d");
-  for(let k=0;k<7;k++){const px=40+Math.random()*48,py=44+Math.random()*40,r=26+Math.random()*26,g=x.createRadialGradient(px,py,0,px,py,r);
-    g.addColorStop(0,"rgba(255,255,255,.55)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,128,128)}
-  return noMip(new THREE.CanvasTexture(c))}
+// Cloud sheet: procedural noise in the fragment shader, no texture (sprite clouds showed coloured blotches on iPhones).
+// Covered fraction of the sheet follows the forecast cloud cover; the noise drifts with the wind.
+const CLOUD_VS=`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
+const CLOUD_FS=`precision highp float;
+uniform float uCov,uAlpha,uScale;uniform vec2 uOff;uniform vec3 uColor;varying vec2 vUv;
+float hash(vec2 p){vec3 q=fract(vec3(p.xyx)*.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p),u=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
+void main(){
+  float n=clamp((fbm(vUv*uScale+uOff)-.5)*2.4+.5,0.,1.); // spread fbm so cover maps to area more linearly
+  float thr=mix(.95,.05,uCov);                       // more cover → lower threshold → more of the sheet is cloud
+  float a=smoothstep(thr-.06,thr+.14,n)*uAlpha*step(.02,uCov);
+  a*=smoothstep(.5,.36,length(vUv-.5));                // soft round edge, no visible plane border
+  gl_FragColor=vec4(uColor*(.82+.35*n),a);
+}`;
 function texDot(){const c=document.createElement("canvas");c.width=c.height=32;const x=c.getContext("2d"),g=x.createRadialGradient(16,16,0,16,16,16);
   g.addColorStop(0,"rgba(255,255,255,1)");g.addColorStop(.5,"rgba(255,255,255,.6)");g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,32,32);return noMip(new THREE.CanvasTexture(c))}
 
@@ -76,13 +87,13 @@ export async function mount(el,{base="3d/"}={}){
   const sunRef=new THREE.Vector3(0.5,1.4,-3.2); // Fitz Roy: shadows are framed around it
 
   // ---------- clouds ----------
-  const PUFFS=[texPuff(),texPuff(),texPuff()];
-  const layer=(n,y0,y1,s0,s1,max)=>{const g=new THREE.Group();g.userData.max=max;
-    for(let k=0;k<n;k++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:PUFFS[k%3],transparent:true,depthWrite:false,opacity:0,fog:true,alphaTest:0.01}));
-      const sc=s0+Math.random()*(s1-s0);s.scale.set(sc*1.8,sc*0.8,1);
-      s.position.set((Math.random()-.5)*SX*1.3,y0+Math.random()*(y1-y0),(Math.random()-.5)*SZ*1.3);s.userData.r=Math.random();g.add(s)}
-    if(!OFF.has("clouds"))scene.add(g);return g};
-  const LOW=layer(110,0.9,2.0,2.5,5,0.55),MID=layer(110,3.2,4.4,3.5,7,0.42),HIGH=layer(40,7.5,8.5,10,16,0.3);
+  // Two stacked sheets per layer give some thickness. Low sits below the summits (sea of clouds); mid sits above the default camera so it reads as a ceiling.
+  const sheet=(y,scale,alpha,seed)=>{const m=new THREE.ShaderMaterial({vertexShader:CLOUD_VS,fragmentShader:CLOUD_FS,transparent:true,depthWrite:false,side:THREE.DoubleSide,
+      uniforms:{uCov:{value:0},uAlpha:{value:alpha},uScale:{value:scale},uOff:{value:new THREE.Vector2(seed,seed*1.7)},uColor:{value:new THREE.Color(1,1,1)}}});
+    const g=new THREE.PlaneGeometry(SX*1.7,SZ*1.7);g.rotateX(-Math.PI/2);const me=new THREE.Mesh(g,m);me.position.y=y;me.renderOrder=2;
+    if(!OFF.has("clouds"))scene.add(me);return m};
+  const LOW=[sheet(1.55,7,0.8,3.1),sheet(1.85,7,0.6,7.4)],MID=[sheet(5.0,5,0.75,11.2),sheet(5.4,5,0.55,19.8)],HIGH=[sheet(8.5,3,0.4,23.5)];
+  const cov={low:0,mid:0,high:0}; // eased toward the forecast so hour changes fade
 
   // ---------- wind streaks ----------
   // Wind: camera-facing ribbons (WebGL ignores line width), bright head fading to a transparent tail
@@ -123,7 +134,7 @@ export async function mount(el,{base="3d/"}={}){
     cSky.set(0x0b1320).lerp(cTmp.set(0xe7a36c),dusk*dayK).lerp(cTmp.set(0x8fb8dd),dayK*(1-dusk)).lerp(cTmp.set(0x8e969c),overcast*dayK*0.85);
     scene.background=cSky.clone();scene.fog.color.copy(cSky);scene.fog.density=OFF.has("fog")?0:0.004+0.018*Math.max(C.low*C.low,Math.min(1,R.rate*1.5));
     const tint=new THREE.Color(0x2a3440).lerp(new THREE.Color(0xffffff),0.25+0.75*dayK).lerp(new THREE.Color(0xffc9a0),dusk*0.6*dayK).lerp(new THREE.Color(0x9aa3aa),overcast*0.5);
-    [[LOW,C.low],[MID,C.mid],[HIGH,C.high*0.6]].forEach(([g,cov])=>g.children.forEach(sp=>{sp.material.color.copy(tint);sp.userData.target=sp.userData.r<cov?g.userData.max*(0.6+0.4*cov):0}));
+    for(const m of [...LOW,...MID,...HIGH])m.uniforms.uColor.value.copy(tint);
     return {sunAlt:s.alt*180/Math.PI};
   }
 
@@ -135,11 +146,10 @@ export async function mount(el,{base="3d/"}={}){
   function tick(){
     raf=0;if(!visible)return;
     const dt=Math.min(0.05,clock.getDelta()),drift=W.speed/60;
-    for(const g of [LOW,MID,HIGH])for(const sp of g.children){const k=g===HIGH?1.6:1;
-      sp.position.x+=W.dx*drift*dt*k;sp.position.z+=W.dz*drift*dt*k;
-      if(sp.position.x>SX*.65)sp.position.x-=SX*1.3;if(sp.position.x<-SX*.65)sp.position.x+=SX*1.3;
-      if(sp.position.z>SZ*.65)sp.position.z-=SZ*1.3;if(sp.position.z<-SZ*.65)sp.position.z+=SZ*1.3;
-      const o=sp.material.opacity,tg=sp.userData.target||0;sp.material.opacity=o+(tg-o)*Math.min(1,dt*2.5)}
+    const ease=Math.min(1,dt*2.5);cov.low+=(C.low-cov.low)*ease;cov.mid+=(C.mid-cov.mid)*ease;cov.high+=(C.high-cov.high)*ease;
+    for(const [ms,c,k] of [[LOW,cov.low,1],[MID,cov.mid,1],[HIGH,cov.high*0.7,1.6]])for(const m of ms){
+      m.uniforms.uCov.value=c;const sc=m.uniforms.uScale.value/(SX*1.7); // noise units per km
+      m.uniforms.uOff.value.x-=W.dx*drift*dt*k*sc;m.uniforms.uOff.value.y+=W.dz*drift*dt*k*sc} // uv.y points north, scene +z south
     // more, longer and brighter streaks as the wind rises; always clearly visible from ~10 km/h
     const len=0.5+W.speed/30,active=W.speed<5?0:Math.round(NW*Math.min(1,0.15+W.speed/70));wmat.opacity=Math.min(0.95,0.55+W.speed/120);
     wdir.set(W.dx,0,W.dz);
