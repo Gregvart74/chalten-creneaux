@@ -53,6 +53,43 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .day small.hum{color:var(--warn);font-family:var(--f-body);font-weight:600;white-space:normal}
 .day small b{font-size:inherit;color:var(--fg)}
 .why{}
+.tabc{display:flex;flex-direction:column;gap:14px}
+.tabc[hidden]{display:none}
+.tabs{align-self:flex-start}
+.h-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.h-head h2{margin:0}
+.h-load{color:var(--muted)}
+.h-cal{display:flex;flex-direction:column;gap:2px}
+.h-row{display:grid;grid-template-columns:34px repeat(31,minmax(0,1fr));gap:2px;align-items:center}
+.h-m{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.h-c{aspect-ratio:1;padding:0;border:0;border-radius:2px;font-size:9px;line-height:1;color:var(--fg);display:flex;align-items:center;justify-content:center;min-width:0;cursor:pointer}
+.h-c.go{background:var(--go-bg)} .h-c.warn{background:var(--warn-bg)} .h-c.no{background:var(--no-bg)} .h-c.none{background:var(--line);opacity:.35}
+.h-c.empty{background:none;cursor:default}
+.h-c.fc{outline:1px dashed var(--muted);outline-offset:-1px}
+.h-c.sel{outline:2px solid var(--fg);outline-offset:0}
+.h-legend,.h-small,.h-note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.h-legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 8px}
+.h-legend .sw.go{background:var(--go-bg)} .h-legend .sw.warn{background:var(--warn-bg)} .h-legend .sw.no{background:var(--no-bg)}
+.h-title{font-size:16px;text-transform:none;letter-spacing:0;color:var(--fg)}
+.h-badge{font-size:12px;font-weight:600;padding:3px 9px;border-radius:6px}
+.h-badge.go{background:var(--go-bg);color:var(--go)} .h-badge.warn{background:var(--warn-bg);color:var(--warn)} .h-badge.no{background:var(--no-bg);color:var(--no)}
+.h-metrics{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.6}
+.h-metrics .hum{color:var(--warn)}
+#tab-histo h3{font-size:14px;margin:12px 0 6px}
+.h-before{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;width:100%;max-width:520px}
+.h-before th,.h-before td{padding:3px 5px;text-align:center;border-bottom:1px solid var(--line);font-family:var(--f-mono)}
+.h-before tbody th{text-align:left;font-family:var(--f-body);font-weight:600;white-space:nowrap}
+.h-read{font-size:14px;margin:6px 0;max-width:70ch}
+.h-read.warn{color:var(--warn)} .h-read.go{color:var(--go)}
+.h-evs{margin:0;padding-left:18px;font-size:14px;line-height:1.5}
+.h-evs li{margin-bottom:6px}
+.h-evs a{color:var(--muted)}
+.h-ev{font-size:12px;font-weight:600}
+.h-ev.go{color:var(--go)} .h-ev.warn{color:var(--warn)} .h-ev.no{color:var(--no)}
+.h-an{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.h-an-c{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;font-size:13px}
+.h-an-d{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+@media (max-width:599px){.h-row{grid-template-columns:26px repeat(31,minmax(0,1fr));gap:1px}.h-c{font-size:7px}}
 .v3-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .v3-when{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 .v3-box{position:relative;height:480px;border-radius:8px;overflow:hidden;background:#0f161c}
@@ -166,7 +203,13 @@ details.leg>summary{font-size:13px;color:var(--muted);justify-content:flex-start
       </div>
       <button id="refresh" aria-label="Actualiser">↻<span class="lbl"> Actualiser</span></button>
     </div>
+    <nav class="tabs seg" role="tablist" aria-label="Vue">
+      <button role="tab" id="t-prev" aria-selected="true" aria-pressed="true">Prévisions</button>
+      <button role="tab" id="t-histo" aria-selected="false" aria-pressed="false">Historique</button>
+    </nav>
   </header>
+
+  <div id="tab-prev" class="tabc">
 
   <section class="panel">
     <h2>Verdict par jour (04h–20h, le plus prudent des 2 modèles)</h2>
@@ -300,6 +343,8 @@ details.leg>summary{font-size:13px;color:var(--muted);justify-content:flex-start
 
   <section class="links" id="links"></section>
   <p class="meta">Données : Open‑Meteo (NOAA GFS, ECMWF IFS 0.25°). Dernière prévision gardée hors ligne.</p>
+  </div>
+  <div id="tab-histo" class="tabc" hidden></div>
 </div>
 
 <script>
@@ -678,6 +723,16 @@ $("v3-h").oninput=e=>{const D=S.data;if(!D)return;const i=v3Index(),k=D.time[i].
   const j=D.time.findIndex(t=>t.slice(0,10)===k&&+t.slice(11,13)===+e.target.value);if(j>=0){S.v3i=j;v3Update()}};
 $("v3-play").onclick=()=>{if(v3Play){clearInterval(v3Play);v3Play=0;$("v3-play").textContent="▶";return}
   $("v3-play").textContent="❚❚";v3Play=setInterval(()=>{if(!S.data)return;S.v3i=(v3Index()+1)%S.data.time.length;v3Update()},700)};
+// ---------- tabs: Prévisions / Historique (loaded on first open) ----------
+let H=null;
+function setTab(histo){
+  $("tab-prev").hidden=histo;$("tab-histo").hidden=!histo;
+  [["t-prev",!histo],["t-histo",histo]].forEach(([id,on])=>{$(id).setAttribute("aria-selected",on);$(id).setAttribute("aria-pressed",on)});
+  if(histo&&!H){H=import("./historique.js").then(m=>m.mount($("tab-histo"),{th:()=>S.th,forecast:()=>S.data}))
+    .catch(e=>{$("tab-histo").innerHTML='<p class="err">Historique indisponible ('+(e&&e.message||e)+').</p>';H=null})}
+  if(!histo)render();
+}
+$("t-prev").onclick=()=>setTab(false);$("t-histo").onclick=()=>setTab(true);
 $("syn-t").oninput=e=>drawSyn(+e.target.value);
 [["t-ok","ok"],["t-max","max"],["t-dry","dry"]].forEach(([id,k])=>{$(id).value=S.th[k];$(id).onchange=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.th[k]=v;savePrefs();render()}}});
 let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>render(),150)});
