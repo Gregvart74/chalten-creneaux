@@ -29,6 +29,8 @@ function texDot(){const c=document.createElement("canvas");c.width=c.height=32;c
 
 export async function mount(el,{base="3d/"}={}){
   const phone=matchMedia("(max-width:599px)").matches;
+  // Diagnostic switches for device-specific rendering bugs, e.g. ?off=clouds,shadow
+  const OFF=new Set((new URLSearchParams(location.search).get("off")||"").split(",").filter(Boolean));
   const [meta,buf,peaks]=await Promise.all([fetch(base+"relief.json").then(r=>r.json()),fetch(base+"relief.bin").then(r=>r.arrayBuffer()),fetch(base+"peaks.json").then(r=>r.json())]);
   const heights=new Uint16Array(buf);
   const SX=(meta.E-meta.W)*111.32*Math.cos(49.3*Math.PI/180), SZ=(meta.N-meta.S)*111.32; // km
@@ -41,8 +43,8 @@ export async function mount(el,{base="3d/"}={}){
   // ---------- renderer, camera, controls ----------
   const renderer=new THREE.WebGLRenderer({antialias:!phone,powerPreference:"high-performance",precision:"highp"});
   renderer.setPixelRatio(Math.min(devicePixelRatio,phone?1.5:2));
-  renderer.shadowMap.enabled=true;renderer.shadowMap.type=phone?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;
-  renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled=!OFF.has("shadow");renderer.shadowMap.type=phone?THREE.PCFShadowMap:THREE.PCFSoftShadowMap;
+  renderer.toneMapping=OFF.has("tone")?THREE.NoToneMapping:THREE.ACESFilmicToneMapping;renderer.outputColorSpace=THREE.SRGBColorSpace;
   el.appendChild(renderer.domElement);
   const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x8fb8dd,0.01);
   const camera=new THREE.PerspectiveCamera(45,1,0.1,400);
@@ -62,9 +64,7 @@ export async function mount(el,{base="3d/"}={}){
   geo.computeVertexNormals();
   const sat=await new THREE.TextureLoader().loadAsync(base+"sat.jpg");
   sat.colorSpace=THREE.SRGBColorSpace;sat.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-  const iOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-  if(iOS)noMip(sat); // same WebKit sRGB-mipmap bug
-  const terrain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:sat,roughness:0.95,metalness:0}));
+  const terrain=new THREE.Mesh(geo,OFF.has("light")?new THREE.MeshLambertMaterial({map:sat}):new THREE.MeshStandardMaterial({map:sat,roughness:0.95,metalness:0}));
   terrain.castShadow=terrain.receiveShadow=true;scene.add(terrain);
   const skirt=new THREE.Mesh(new THREE.BoxGeometry(SX,0.3,SZ),new THREE.MeshStandardMaterial({color:0x1a2229}));skirt.position.y=-0.16;scene.add(skirt);
 
@@ -81,7 +81,7 @@ export async function mount(el,{base="3d/"}={}){
     for(let k=0;k<n;k++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:PUFFS[k%3],transparent:true,depthWrite:false,opacity:0,fog:true,alphaTest:0.01}));
       const sc=s0+Math.random()*(s1-s0);s.scale.set(sc*1.8,sc*0.8,1);
       s.position.set((Math.random()-.5)*SX*1.3,y0+Math.random()*(y1-y0),(Math.random()-.5)*SZ*1.3);s.userData.r=Math.random();g.add(s)}
-    scene.add(g);return g};
+    if(!OFF.has("clouds"))scene.add(g);return g};
   const LOW=layer(110,0.9,2.0,2.5,5,0.55),MID=layer(110,3.2,4.4,3.5,7,0.42),HIGH=layer(40,7.5,8.5,10,16,0.3);
 
   // ---------- wind streaks ----------
@@ -92,14 +92,14 @@ export async function mount(el,{base="3d/"}={}){
     wcol.set([1,1,1,1, 1,1,1,1, 0.6,0.8,1,0, 0.6,0.8,1,0],k*16)}
   const wgeo=new THREE.BufferGeometry();wgeo.setAttribute("position",new THREE.BufferAttribute(wpos,3));wgeo.setAttribute("color",new THREE.BufferAttribute(wcol,4));wgeo.setIndex(widx);
   const wmat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,fog:false,toneMapped:false});
-  const wmesh=new THREE.Mesh(wgeo,wmat);wmesh.frustumCulled=false;scene.add(wmesh);
+  const wmesh=new THREE.Mesh(wgeo,wmat);wmesh.frustumCulled=false;if(!OFF.has("wind"))scene.add(wmesh);
   const wdir=new THREE.Vector3(),wview=new THREE.Vector3(),wperp=new THREE.Vector3();
 
   // ---------- precipitation ----------
   const NP=phone?2500:4000,ppos=new Float32Array(NP*3),pcol=new Float32Array(NP*3);
   for(let k=0;k<NP;k++){ppos[k*3]=(Math.random()-.5)*SX;ppos[k*3+1]=Math.random()*6;ppos[k*3+2]=(Math.random()-.5)*SZ}
   const pgeo=new THREE.BufferGeometry();pgeo.setAttribute("position",new THREE.BufferAttribute(ppos,3));pgeo.setAttribute("color",new THREE.BufferAttribute(pcol,3));
-  const pmat=new THREE.PointsMaterial({size:0.05,map:texDot(),vertexColors:true,transparent:true,opacity:0,depthWrite:false,alphaTest:0.01});scene.add(new THREE.Points(pgeo,pmat));
+  const pmat=new THREE.PointsMaterial({size:0.05,map:texDot(),vertexColors:true,transparent:true,opacity:0,depthWrite:false,alphaTest:0.01});if(!OFF.has("precip"))scene.add(new THREE.Points(pgeo,pmat));
 
   // ---------- labels ----------
   const lbox=document.createElement("div");lbox.className="v3-labels";el.appendChild(lbox);
@@ -121,7 +121,7 @@ export async function mount(el,{base="3d/"}={}){
     sun.intensity=3.2*dayK*(1-0.75*overcast);sun.color.setRGB(1,0.82+0.18*(1-dusk),0.62+0.38*(1-dusk));
     hemi.intensity=0.08+0.65*dayK;
     cSky.set(0x0b1320).lerp(cTmp.set(0xe7a36c),dusk*dayK).lerp(cTmp.set(0x8fb8dd),dayK*(1-dusk)).lerp(cTmp.set(0x8e969c),overcast*dayK*0.85);
-    scene.background=cSky.clone();scene.fog.color.copy(cSky);scene.fog.density=0.004+0.018*Math.max(C.low*C.low,Math.min(1,R.rate*1.5));
+    scene.background=cSky.clone();scene.fog.color.copy(cSky);scene.fog.density=OFF.has("fog")?0:0.004+0.018*Math.max(C.low*C.low,Math.min(1,R.rate*1.5));
     const tint=new THREE.Color(0x2a3440).lerp(new THREE.Color(0xffffff),0.25+0.75*dayK).lerp(new THREE.Color(0xffc9a0),dusk*0.6*dayK).lerp(new THREE.Color(0x9aa3aa),overcast*0.5);
     [[LOW,C.low],[MID,C.mid],[HIGH,C.high*0.6]].forEach(([g,cov])=>g.children.forEach(sp=>{sp.material.color.copy(tint);sp.userData.target=sp.userData.r<cov?g.userData.max*(0.6+0.4*cov):0}));
     return {sunAlt:s.alt*180/Math.PI};
