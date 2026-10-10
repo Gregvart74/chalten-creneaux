@@ -76,6 +76,27 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .h-metrics{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.6}
 .h-metrics .hum{color:var(--warn)}
 #tab-histo h3{font-size:14px;margin:12px 0 6px}
+.s-intro{font-size:14px;color:var(--muted);margin:0 0 10px;max-width:70ch}
+.s-months{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.s-m{display:flex;flex-direction:column;gap:3px;padding:10px;border-radius:8px;border:1px solid var(--line)}
+.s-m.go{background:var(--go-bg)} .s-m.no{background:var(--no-bg)}
+.s-m b{font-size:15px} .s-m .s-reg{font-weight:800;font-size:13px}
+.s-m.go .s-reg{color:var(--go)} .s-m.no .s-reg{color:var(--no)}
+.s-m small{font-size:12px;color:var(--muted)}
+#s-map{width:100%;height:auto;display:block;border-radius:6px}
+.s-scale{height:8px;border-radius:4px;margin:6px 0 2px;background:linear-gradient(90deg,#3b5ba5,#f6f4f0,#c4452c)}
+.s-scale-l{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.s-weeks{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px}
+.s-w{display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:8px;border:1px solid var(--line);font-family:var(--f-mono);font-size:12px}
+.s-w b{font-family:var(--f-body);font-size:13px} .s-w small{color:var(--muted)}
+.s-w.go{background:var(--go-bg)} .s-w.no{background:var(--no-bg)}
+.s-clim{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;align-items:end}
+.s-c{display:flex;flex-direction:column;align-items:center;gap:3px}
+.s-bar{height:160px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:1px;position:relative}
+.s-bar b{position:absolute;left:10%;right:10%;bottom:0;background:var(--go-bg);border-top:2px solid var(--go)}
+.s-bar i{position:relative;width:3px;background:var(--go);opacity:.5}
+.s-v{font-family:var(--f-mono);font-size:11px}
+.s-l{font-size:11px;color:var(--muted)}
 .h-before{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;width:100%;max-width:520px}
 .h-before th,.h-before td{padding:3px 5px;text-align:center;border-bottom:1px solid var(--line);font-family:var(--f-mono)}
 .h-before tbody th{text-align:left;font-family:var(--f-body);font-weight:600;white-space:nowrap}
@@ -206,6 +227,7 @@ details.leg>summary{font-size:13px;color:var(--muted);justify-content:flex-start
     <nav class="tabs seg" role="tablist" aria-label="Vue">
       <button role="tab" id="t-prev" aria-selected="true" aria-pressed="true">Prévisions</button>
       <button role="tab" id="t-histo" aria-selected="false" aria-pressed="false">Historique</button>
+      <button role="tab" id="t-saison" aria-selected="false" aria-pressed="false">Saison</button>
     </nav>
   </header>
 
@@ -345,6 +367,7 @@ details.leg>summary{font-size:13px;color:var(--muted);justify-content:flex-start
   <p class="meta">Données : Open‑Meteo (NOAA GFS, ECMWF IFS 0.25°). Dernière prévision gardée hors ligne.</p>
   </div>
   <div id="tab-histo" class="tabc" hidden></div>
+  <div id="tab-saison" class="tabc" hidden></div>
 </div>
 
 <script>
@@ -723,16 +746,21 @@ $("v3-h").oninput=e=>{const D=S.data;if(!D)return;const i=v3Index(),k=D.time[i].
   const j=D.time.findIndex(t=>t.slice(0,10)===k&&+t.slice(11,13)===+e.target.value);if(j>=0){S.v3i=j;v3Update()}};
 $("v3-play").onclick=()=>{if(v3Play){clearInterval(v3Play);v3Play=0;$("v3-play").textContent="▶";return}
   $("v3-play").textContent="❚❚";v3Play=setInterval(()=>{if(!S.data)return;S.v3i=(v3Index()+1)%S.data.time.length;v3Update()},700)};
-// ---------- tabs: Prévisions / Historique (loaded on first open) ----------
-let H=null;
-function setTab(histo){
-  $("tab-prev").hidden=histo;$("tab-histo").hidden=!histo;
-  [["t-prev",!histo],["t-histo",histo]].forEach(([id,on])=>{$(id).setAttribute("aria-selected",on);$(id).setAttribute("aria-pressed",on)});
-  if(histo&&!H){H=import("./historique.js").then(m=>m.mount($("tab-histo"),{th:()=>S.th,forecast:()=>S.data}))
-    .catch(e=>{$("tab-histo").innerHTML='<p class="err">Historique indisponible ('+(e&&e.message||e)+').</p>';H=null})}
-  if(!histo)render();
+// ---------- tabs: Prévisions / Historique / Saison (modules loaded on first open) ----------
+const TABS={
+  prev:null,
+  histo:{file:"./historique.js",ctx:()=>({th:()=>S.th,forecast:()=>S.data}),err:"Historique indisponible"},
+  saison:{file:"./saison.js",ctx:()=>({th:()=>S.th,store,coast:COAST}),err:"Saison indisponible"},
+};
+const loaded={};
+function setTab(name){
+  for(const t in TABS){$("tab-"+t).hidden=t!==name;$("t-"+t).setAttribute("aria-selected",t===name);$("t-"+t).setAttribute("aria-pressed",t===name)}
+  const T=TABS[name];
+  if(T&&!loaded[name]){loaded[name]=import(T.file).then(m=>m.mount($("tab-"+name),T.ctx()))
+    .catch(e=>{$("tab-"+name).innerHTML='<p class="err">'+T.err+' ('+(e&&e.message||e)+').</p>';loaded[name]=null})}
+  if(name==="prev")render();
 }
-$("t-prev").onclick=()=>setTab(false);$("t-histo").onclick=()=>setTab(true);
+for(const t in TABS)$("t-"+t).onclick=()=>setTab(t);
 $("syn-t").oninput=e=>drawSyn(+e.target.value);
 [["t-ok","ok"],["t-max","max"],["t-dry","dry"]].forEach(([id,k])=>{$(id).value=S.th[k];$(id).onchange=e=>{const v=parseFloat(e.target.value);if(!isNaN(v)){S.th[k]=v;savePrefs();render()}}});
 let rz;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>render(),150)});
